@@ -21,9 +21,12 @@ class DownloaderTestImpl private constructor(builder: OkHttpClient.Builder) : Do
         if (dataToSend != null) {
             requestBody = dataToSend.toRequestBody(null, 0, dataToSend.size)
         }
+        val hasUserAgent = headers.keys.any { it.equals("User-Agent", ignoreCase = true) }
         val requestBuilder: okhttp3.Request.Builder = okhttp3.Request.Builder()
             .method(httpMethod, requestBody).url(url)
-            .addHeader("User-Agent", USER_AGENT)
+        if (!hasUserAgent) {
+            requestBuilder.header("User-Agent", USER_AGENT)
+        }
 
         for ((headerName, headerValueList) in headers) {
             if (headerValueList.size > 1) {
@@ -51,7 +54,7 @@ class DownloaderTestImpl private constructor(builder: OkHttpClient.Builder) : Do
 
     companion object {
         private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         private var instance: DownloaderTestImpl? = null
 
         /**

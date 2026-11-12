@@ -57,7 +57,7 @@ internal actual object DeviceTheme {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             colorResource(android.R.color.system_accent1_200)
         } else {
-            CloudStreamPrimaryColor.NORMAL.color
+            CloudStreamPrimaryColor.VELVET_NOIR.color
         }
     }
 
@@ -67,7 +67,7 @@ internal actual object DeviceTheme {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             colorResource(android.R.color.system_accent2_200)
         } else {
-            CloudStreamPrimaryColor.NORMAL.color
+            CloudStreamPrimaryColor.VELVET_NOIR.color
         }
     }
 }

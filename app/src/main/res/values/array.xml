@@ -255,50 +255,24 @@
     </array>
 
     <string-array name="themes_overlay_names">
-        <item>Normal</item>
-        <item>Dandelion Yellow</item>
-        <item>Carnation Pink</item>
-        <item>Orange</item>
-        <item>Dark Green</item>
-        <item>Maroon</item>
-        <item>Navy Blue</item>
-        <item>Grey</item>
-        <item>White</item>
-        <item>Cool Blue</item>
-        <item>Brown</item>
-        <item>Cool</item>
-        <item>Fire</item>
-        <item>Burple</item>
-        <item>Green</item>
-        <item>Apple</item>
-        <item>Banana</item>
-        <item>Party</item>
-        <item>Pink Pain</item>
-        <item>Lavender</item>
+        <item>Velvet Noir</item>
+        <item>Aura Brass</item>
+        <item>Smoked Cognac</item>
+        <item>Obsidian Pine</item>
+        <item>Fincher Teal</item>
+        <item>Midnight Lapis</item>
+        <item>Nocturne Violet</item>
         <item>Material You</item>
         <item>Material You (Secondary)</item>
     </string-array>
     <string-array name="themes_overlay_names_values">
-        <item>Normal</item>
-        <item>DandelionYellow</item>
-        <item>CarnationPink</item>
-        <item>Orange</item>
-        <item>DarkGreen</item>
-        <item>Maroon</item>
-        <item>NavyBlue</item>
-        <item>Grey</item>
-        <item>White</item>
-        <item>CoolBlue</item>
-        <item>Brown</item>
-        <item>Blue</item>
-        <item>Red</item>
-        <item>Purple</item>
-        <item>Green</item>
-        <item>GreenApple</item>
-        <item>Banana</item>
-        <item>Party</item>
-        <item>Pink</item>
-        <item>Lavender</item>
+        <item>VelvetNoir</item>
+        <item>AuraBrass</item>
+        <item>SmokedCognac</item>
+        <item>ObsidianPine</item>
+        <item>FincherTeal</item>
+        <item>MidnightLapis</item>
+        <item>NocturneViolet</item>
         <item>Monet</item>
         <item>Monet2</item>
     </string-array>

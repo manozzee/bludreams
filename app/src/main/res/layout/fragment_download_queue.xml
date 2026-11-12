@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -22,13 +21,13 @@
                 android:id="@+id/download_queue_toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="?attr/primaryGrayBackground"
-                android:paddingTop="@dimen/navbar_height"
+                android:background="?attr/primaryBlackBackground"
                 app:layout_scrollFlags="scroll|enterAlways"
                 app:menu="@menu/download_queue"
                 app:navigationIconTint="?attr/iconColor"
+                app:titleTextAppearance="@style/TextAppearance.CloudStream.Title"
                 app:titleTextColor="?attr/textColor"
-                tools:title="Overlord" />
+                tools:title="Download queue" />
 
         </com.google.android.material.appbar.AppBarLayout>
 
@@ -42,9 +41,11 @@
                 android:id="@+id/download_queue_list"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:clipToPadding="false"
                 android:nextFocusLeft="@id/navigation_downloads"
                 android:nextFocusUp="@id/download_queue_toolbar"
-                android:padding="10dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="120dp"
                 app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
                 tools:listitem="@layout/download_queue_item" />
 
@@ -52,13 +53,46 @@
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
-    <TextView
+    <LinearLayout
         android:id="@+id/text_no_queue"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:gravity="center"
-        android:text="@string/queue_empty_message"
-        android:visibility="visible" />
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="visible">
+
+        <FrameLayout
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/circular_action_button_bg">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/baseline_downloading_24"
+                app:tint="?attr/textColor"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/download_queue"
+            android:textAppearance="@style/TextAppearance.CloudStream.Title"
+            android:textColor="?attr/textColor"
+            android:textSize="17sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/queue_empty_sub"
+            android:textColor="?attr/grayTextColor"
+            android:textSize="13sp" />
+    </LinearLayout>
 
 </FrameLayout>

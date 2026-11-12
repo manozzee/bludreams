@@ -78,7 +78,7 @@
                 android:nextFocusDown="@id/account_name"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="@color/primaryGrayBackground">
+                app:cardBackgroundColor="?attr/primaryGrayBackground">
 
                 <ImageView
                     android:id="@+id/edit_profile_photo_button"

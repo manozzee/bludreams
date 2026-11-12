@@ -3,7 +3,6 @@ package com.mihon.presentation.settings.widget
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -11,13 +10,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream4.generated.resources.Res
 import com.lagradost.cloudstream4.generated.resources.preview
 import com.lagradost.cloudstream4.theme.CloudStreamPreviewTheme
 import org.jetbrains.compose.resources.painterResource
-import com.mihon.presentation.secondaryItemAlpha
 
 @Composable
 fun TextPreferenceWidget(
@@ -25,7 +25,8 @@ fun TextPreferenceWidget(
     title: String? = null,
     subtitle: String? = null,
     icon: Painter? = null,
-    iconTint: Color = MaterialTheme.colorScheme.onBackground,
+    iconTint: Color = Color.White,
+    tileColor: Color? = null,
     widget: @Composable (() -> Unit)? = null,
     onPreferenceClick: (() -> Unit)? = null,
 ) {
@@ -36,11 +37,14 @@ fun TextPreferenceWidget(
             {
                 Text(
                     text = subtitle,
-                    modifier = Modifier
-                        .padding(horizontal = PrefsHorizontalPadding)
-                        .secondaryItemAlpha(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 10,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                    ),
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
         } else {
@@ -48,11 +52,10 @@ fun TextPreferenceWidget(
         },
         icon = if (icon != null) {
             {
-                Icon(
-                    painter = icon,
-                    modifier = Modifier.size(24.dp),
-                    tint = iconTint,
-                    contentDescription = null,
+                SettingsIconTile(
+                    icon = icon,
+                    backgroundColor = tileColor ?: LocalTileBackgroundColor.current ?: defaultTileColor(),
+                    iconTint = iconTint,
                 )
             }
         } else {

@@ -1,43 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/home_history_tab"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/outline_drawable_less"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="6dp"
+    android:foreground="?android:attr/selectableItemBackground"
     android:focusable="true"
+    android:clickable="true"
     android:nextFocusRight="@id/home_history_remove"
-    android:orientation="horizontal">
-    <!-- android:foreground="?android:attr/selectableItemBackgroundBorderless"
-      -->
-    <TextView
-        android:id="@+id/home_history_title"
-        android:layout_width="0dp"
+    app:cardBackgroundColor="?attr/primaryGrayBackground"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:cardMaxElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#14FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="10dp"
-        android:textColor="?attr/textColor"
-        android:textSize="18sp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/home_history_remove"
-        tools:text="Hello World" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
-    <ImageView
-        android:id="@+id/home_history_remove"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_gravity="center_vertical|end"
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            app:cardBackgroundColor="?attr/iconGrayBackground"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="0dp"
+            app:cardMaxElevation="0dp"
+            app:strokeWidth="0dp">
 
-        android:background="@drawable/outline_drawable_less"
-        android:focusable="true"
-        android:nextFocusLeft="@id/home_history_tab"
-        android:padding="10dp"
-        android:src="@drawable/ic_baseline_close_24"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:tint="?attr/white"
-        tools:ignore="ContentDescription" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/search_hint"
+                android:src="@drawable/history_toggle_off_24px"
+                app:tint="?attr/textColor" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/home_history_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
+            android:textColor="?attr/textColor"
+            android:textSize="15sp"
+            tools:text="Search history item" />
+
+        <ImageView
+            android:id="@+id/home_history_remove"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center_vertical"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:focusable="true"
+            android:nextFocusLeft="@id/home_history_tab"
+            android:padding="8dp"
+            android:src="@drawable/ic_baseline_close_24"
+            app:tint="?attr/grayTextColor"
+            tools:ignore="ContentDescription" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

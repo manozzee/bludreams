@@ -63,6 +63,9 @@ class UIPreferences(preferences: PreferenceStore) {
     val primaryColor = preferences.getString(
         "primary_color_key", "Normal"
     )
+    val pureBlack = preferences.getBoolean(
+        "pure_black_key", false
+    )
     val theme = preferences.getString(
         "app_theme_key", "AmoledLight"
     )

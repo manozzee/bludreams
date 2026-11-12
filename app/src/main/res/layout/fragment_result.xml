@@ -364,8 +364,8 @@
                                 android:layout_marginBottom="5dp"
                                 android:maxLines="2"
                                 android:textColor="?attr/textColor"
-                                android:textSize="20sp"
-                                android:textStyle="bold"
+                                android:textAppearance="@style/TextAppearance.CloudStream.Headline"
+                                android:textSize="22sp"
                                 tools:text="The Perfect Run The Perfect Run" />
 
                             <com.lagradost.cloudstream3.widget.FlowLayout

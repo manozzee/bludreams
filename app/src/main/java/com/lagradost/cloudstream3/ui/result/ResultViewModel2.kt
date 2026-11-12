@@ -1897,8 +1897,12 @@ class ResultViewModel2 : ViewModel() {
         sorting: EpisodeSortType
     ): List<ResultEpisode> {
         return when (sorting) {
-            EpisodeSortType.NUMBER_ASC -> episodes.sortedBy { it.episode }
-            EpisodeSortType.NUMBER_DESC -> episodes.sortedByDescending { it.episode }
+            EpisodeSortType.NUMBER_ASC -> episodes.sortedWith(
+                compareBy<ResultEpisode> { it.episode }.thenBy { it.index }
+            )
+            EpisodeSortType.NUMBER_DESC -> episodes.sortedWith(
+                compareByDescending<ResultEpisode> { it.episode }.thenByDescending { it.index }
+            )
             EpisodeSortType.RATING_HIGH_LOW -> episodes.sortedByDescending {
                 it.score?.toDouble() ?: 0.0
             }

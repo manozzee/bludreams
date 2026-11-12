@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import androidx.preference.PreferenceManager
 import androidx.viewbinding.ViewBinding
 import com.lagradost.cloudstream3.R
@@ -17,7 +18,17 @@ import com.lagradost.cloudstream3.ui.BaseAdapter
 import com.lagradost.cloudstream3.ui.BaseDiffCallback
 import com.lagradost.cloudstream3.ui.ViewHolderState
 import com.lagradost.cloudstream3.ui.newSharedPool
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.ui.home.PosterCardFromSearchResponse
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import com.lagradost.cloudstream3.ui.liquidglass.PosterShape
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
+import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_SHOW_METADATA
 import com.lagradost.cloudstream3.ui.search.SearchClickCallback
 import com.lagradost.cloudstream3.ui.search.SearchResultBuilder
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
@@ -25,6 +36,10 @@ import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.UIHelper.isBottomLayout
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
+
+class ComposeViewBinding(val composeView: ComposeView) : ViewBinding {
+    override fun getRoot(): View = composeView
+}
 
 class HomeScrollViewHolderState(view: ViewBinding) : ViewHolderState<Boolean>(view) {
     // very shitty that we cant store the state when the view clears,
@@ -148,14 +163,24 @@ open class HomeChildItemAdapter(
     protected var setHeight = 0
 
     override fun onCreateContent(parent: ViewGroup): ViewHolderState<Boolean> {
-        val expanded = parent.context.isBottomLayout()
-        val inflater = LayoutInflater.from(parent.context)
-        val binding = if (expanded) HomeResultGridExpandedBinding.inflate(
-            inflater,
-            parent,
-            false
-        ) else HomeResultGridBinding.inflate(inflater, parent, false)
-        return HomeScrollViewHolderState(binding)
+        val composeView = ComposeView(parent.context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setViewCompositionStrategy(
+                ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+            )
+        }
+        return HomeScrollViewHolderState(ComposeViewBinding(composeView))
+    }
+
+    override fun onClearView(holder: ViewHolderState<Boolean>) {
+        ((holder.view as? ComposeViewBinding)?.composeView ?: holder.itemView as? ComposeView)?.disposeComposition()
+        val imageView = holder.view.root.findViewById<ImageView>(R.id.imageView)
+        if (imageView != null) {
+            clearImage(imageView)
+        }
     }
 
     companion object {
@@ -208,22 +233,58 @@ open class HomeChildItemAdapter(
         item: SearchResponse,
         position: Int
     ) {
-        applyBinding(holder, position == 0)
-
-        SearchResultBuilder.bind(
-            clickCallback = { click ->
-                // ok, so here we hijack the callback to fix the focus
-                when (click.action) {
-                    SEARCH_ACTION_LOAD -> (holder as? HomeScrollViewHolderState)?.wasFocused = true
+        val composeView = (holder.view as? ComposeViewBinding)?.composeView ?: holder.itemView as? ComposeView
+        if (composeView != null) {
+            composeView.setContent {
+                LiquidGlassTheme {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                    ) {
+                        PosterCardFromSearchResponse(
+                            item = item,
+                            forceShape = if (isHorizontal) PosterShape.Landscape else null,
+                            onClick = {
+                                (holder as? HomeScrollViewHolderState)?.wasFocused = true
+                                clickCallback(
+                                    SearchClickCallback(
+                                        action = SEARCH_ACTION_LOAD,
+                                        view = holder.itemView,
+                                        position = position,
+                                        card = item
+                                    )
+                                )
+                            },
+                            onLongClick = {
+                                clickCallback(
+                                    SearchClickCallback(
+                                        action = SEARCH_ACTION_SHOW_METADATA,
+                                        view = holder.itemView,
+                                        position = position,
+                                        card = item
+                                    )
+                                )
+                            }
+                        )
+                    }
                 }
-                clickCallback(click)
-            },
-            item,
-            position,
-            holder.itemView,
-            nextFocusUp,
-            nextFocusDown
-        )
+            }
+        } else {
+            applyBinding(holder, position == 0)
+
+            SearchResultBuilder.bind(
+                clickCallback = { click ->
+                    when (click.action) {
+                        SEARCH_ACTION_LOAD -> (holder as? HomeScrollViewHolderState)?.wasFocused = true
+                    }
+                    clickCallback(click)
+                },
+                item,
+                position,
+                holder.itemView,
+                nextFocusUp,
+                nextFocusDown
+            )
+        }
 
         holder.itemView.tag = position
     }

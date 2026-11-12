@@ -1,122 +1,132 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root_holder"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:id="@+id/root_holder"
-    android:layout_marginVertical="2.5dp"
     android:orientation="vertical">
 
-    <androidx.cardview.widget.CardView
-        tools:visibility="visible"
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/download_child_episode_holder"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="3dp"
         android:focusable="true"
         android:foreground="@drawable/outline_drawable"
         android:nextFocusLeft="@id/nav_rail_view"
         android:nextFocusRight="@id/download_button"
-        app:cardBackgroundColor="@color/transparent"
-        app:cardCornerRadius="@dimen/rounded_image_radius"
-        app:cardElevation="0dp">
+        app:cardBackgroundColor="?attr/primaryGrayBackground"
+        app:cardElevation="0dp"
+        app:cardMaxElevation="0dp"
+        app:strokeWidth="0dp"
+        tools:visibility="visible">
 
-        <GridLayout
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:foreground="?android:attr/selectableItemBackgroundBorderless">
+            android:layout_height="wrap_content"
+            android:foreground="?android:attr/selectableItemBackgroundBorderless"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="12dp">
 
             <ImageView
                 android:id="@+id/download_child_episode_play"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:layout_gravity="center_vertical"
-                android:layout_marginStart="10dp"
-                android:layout_marginEnd="10dp"
+                android:layout_marginEnd="12dp"
                 android:contentDescription="@string/episode_play_img_des"
-                android:src="@drawable/ic_baseline_play_arrow_24"
-                android:visibility="gone" />
+                android:src="@drawable/ic_baseline_drag_handle_24"
+                android:visibility="visible"
+                app:tint="?attr/grayTextColor" />
 
             <LinearLayout
-                android:gravity="center"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:layout_marginEnd="50dp"
+                android:layout_weight="1"
                 android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/download_child_episode_text"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginStart="10dp"
-                    android:layout_marginEnd="10dp"
-                    android:ellipsize="end"
-                    android:gravity="center_vertical"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="marquee"
+                    android:marqueeRepeatLimit="marquee_forever"
+                    android:scrollHorizontally="true"
                     android:singleLine="true"
                     android:textColor="?attr/textColor"
-                    tools:text="Episode 1 Episode 1 Episode 1 Episode 1 Episode 1 Episode 1 Episode 1" />
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="Episode 1 • Season 1" />
 
                 <TextView
                     android:id="@+id/download_child_episode_text_extra"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginStart="10dp"
-                    android:layout_marginEnd="10dp"
-                    android:gravity="center_vertical"
+                    android:layout_marginTop="2dp"
                     android:textColor="?attr/grayTextColor"
-                    tools:text="One piece" />
+                    android:textSize="12sp"
+                    tools:text="One Piece" />
             </LinearLayout>
 
             <com.lagradost.cloudstream3.ui.download.button.PieFetchButton
                 android:id="@+id/download_button"
                 android:layout_width="@dimen/download_size"
                 android:layout_height="@dimen/download_size"
-                android:layout_gravity="center_vertical|end"
-                android:layout_marginStart="-50dp"
+                android:layout_gravity="center_vertical"
                 android:focusable="true"
-                app:download_animate_waiting="true"
                 android:foreground="@drawable/outline_drawable"
                 android:nextFocusLeft="@id/download_child_episode_holder"
-                android:padding="10dp" />
+                android:padding="10dp"
+                app:download_animate_waiting="true" />
 
             <CheckBox
                 android:id="@+id/delete_checkbox"
                 android:layout_width="@dimen/download_size"
                 android:layout_height="@dimen/download_size"
-                android:layout_gravity="center_vertical|end"
-                android:layout_marginStart="-50dp"
+                android:layout_gravity="center_vertical"
                 android:focusable="true"
                 android:nextFocusLeft="@id/download_child_episode_holder"
                 android:padding="10dp"
                 android:visibility="gone" />
-        </GridLayout>
-    </androidx.cardview.widget.CardView>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <LinearLayout
-        android:visibility="gone"
-        tools:visibility="visible"
         android:id="@+id/separator_holder"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:orientation="horizontal">
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        tools:visibility="visible">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="5dp"
-            android:text="@string/parallel_downloads">
-
-        </TextView>
+            android:paddingStart="0dp"
+            android:paddingEnd="10dp"
+            android:text="@string/parallel_downloads"
+            android:textColor="?attr/grayTextColor"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <ImageView
             android:layout_width="match_parent"
-            android:layout_height="5dp"
-            android:src="@drawable/dashed_line_horizontal" />
+            android:layout_height="2dp"
+            android:background="?attr/primaryGrayBackground"
+            tools:ignore="ContentDescription" />
     </LinearLayout>
-
 
 </LinearLayout>

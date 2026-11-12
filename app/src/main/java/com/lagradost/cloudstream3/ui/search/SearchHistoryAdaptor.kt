@@ -62,6 +62,8 @@ class SearchHistoryAdaptor(
         position: Int
     ) {
         val binding = holder.view as? SearchHistoryItemBinding ?: return
+        val bg = com.lagradost.cloudstream3.utils.GroupCardHelper.getAccentContainerColor(binding.root.context)
+        binding.homeHistoryTab.setCardBackgroundColor(android.content.res.ColorStateList.valueOf(bg))
         binding.apply {
             homeHistoryTitle.text = item.searchText
 

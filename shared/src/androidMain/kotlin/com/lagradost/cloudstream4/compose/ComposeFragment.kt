@@ -13,8 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.lagradost.cloudstream4.rememberAppSettings
 import com.lagradost.cloudstream4.theme.CloudStreamTheme
+import com.lagradost.cloudstream4.theme.boolToMode
 import com.lagradost.cloudstream4.theme.perfToColor
-import com.lagradost.cloudstream4.theme.perfToMode
 import com.mihon.presentation.LocalBackPress
 import com.mihon.presentation.settings.collectAsState
 
@@ -33,13 +33,13 @@ fun Screen.createComposeView(
 @Composable
 fun CloudStreamThemeAppSettings(content: @Composable () -> Unit) {
     val settings = rememberAppSettings()
-    val mode by settings.ui.theme.collectAsState()
+    val pureBlack by settings.ui.pureBlack.collectAsState()
     val primaryColor by settings.ui.primaryColor.collectAsState()
     val layout by settings.ui.layout.collectAsState()
     val layoutFlag = DeviceLayout.layoutToFlag(LocalContext.current, layout)
 
     CloudStreamTheme(
-        mode = perfToMode(mode),
+        mode = boolToMode(pureBlack),
         primaryColor = perfToColor(primaryColor),
     ) {
         val backDispatcher = checkNotNull(LocalOnBackPressedDispatcherOwner.current) {

@@ -7,20 +7,21 @@
             android:icon="@drawable/ic_baseline_color_lens_24"
             android:key="@string/primary_color_key"
             android:title="@string/primary_color_settings" />
-        <Preference
-            android:icon="@drawable/ic_baseline_color_lens_24"
-            android:key="@string/app_theme_key"
-            android:title="@string/app_theme_settings" />
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/palette_24px"
+            android:key="@string/pure_black_key"
+            android:summary="@string/pure_black_settings_des"
+            android:title="@string/pure_black_settings" />
         <Preference
             android:icon="@drawable/ic_baseline_tv_24"
             android:key="@string/app_layout_key"
             android:title="@string/app_layout" />
-        <SwitchPreference
-            android:defaultValue="true"
-            android:icon="@drawable/title_24px"
-            android:key="@string/bottom_title_key"
-            android:summary="@string/bottom_title_settings_des"
-            android:title="@string/bottom_title_settings" />
+        <Preference
+            android:icon="@drawable/baseline_grid_view_24"
+            android:key="poster_card_style_key"
+            android:summary="Customize poster dimensions, corner radius, badges, and information"
+            android:title="Poster Card Style" />
 
         <SeekBarPreference
             android:defaultValue="0"
@@ -33,25 +34,9 @@
             app:min="0"
             app:seekBarIncrement="1"
             app:showSeekBarValue="true" />
-
-        <SeekBarPreference
-            android:defaultValue="0"
-            android:icon="@drawable/baseline_grid_view_24"
-            android:key="@string/poster_size_key"
-            android:max="15"
-            android:summary="@string/poster_size_settings_des"
-            android:title="@string/poster_size_settings"
-            app:adjustable="true"
-            app:min="0"
-            app:seekBarIncrement="1"
-            app:showSeekBarValue="true" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/pref_category_ui_features">
-        <Preference
-            android:icon="@drawable/ic_baseline_tv_24"
-            android:key="@string/poster_ui_key"
-            android:title="@string/poster_ui_settings" />
         <SwitchPreference
             android:icon="@drawable/search_icon"
             android:summary="@string/advanced_search_des"
@@ -95,20 +80,15 @@
                 android:title="@string/tv_layout_clock_settings"
                 android:defaultValue="false"
                 android:key="@string/tv_layout_clock_key" />
-        <SwitchPreference
-            android:icon="@drawable/ic_baseline_play_arrow_24"
-            android:summary="@string/random_button_settings_desc"
-            android:title="@string/random_button_settings"
-            app:defaultValue="false"
-            app:key="@string/random_button_key" />
+        <Preference
+            android:icon="@drawable/ic_baseline_filter_list_24"
+            android:key="home_page_source_key"
+            android:summary="@string/home_page_source_summary"
+            android:title="@string/home_page_source_title" />
         <Preference
             android:icon="@drawable/ic_baseline_exit_24"
             android:key="@string/confirm_exit_key"
             android:summary="@string/confirm_before_exiting_desc"
             android:title="@string/confirm_before_exiting_title" />
-        <Preference
-            android:icon="@drawable/ic_baseline_filter_list_24"
-            android:key="@string/pref_filter_search_quality_key"
-            android:title="@string/pref_filter_search_quality" />
     </PreferenceCategory>
 </PreferenceScreen>

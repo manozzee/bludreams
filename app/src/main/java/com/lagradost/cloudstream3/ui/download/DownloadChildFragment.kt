@@ -40,9 +40,12 @@ class DownloadChildFragment : BaseFragment<FragmentChildDownloadsBinding>(
         }
     }
 
+    private var hasLoadedDataOnce = false
+
     override fun onDestroyView() {
         activity?.detachBackPressedCallback("Downloads")
         downloadViewModel.clearChildren()
+        hasLoadedDataOnce = false
         super.onDestroyView()
     }
 
@@ -58,7 +61,7 @@ class DownloadChildFragment : BaseFragment<FragmentChildDownloadsBinding>(
         val folder = arguments?.getString("folder")
         val name = arguments?.getString("name")
         if (folder == null) {
-            dispatchBackPressed()
+            view?.post { dispatchBackPressed() }
             return
         }
 
@@ -80,14 +83,26 @@ class DownloadChildFragment : BaseFragment<FragmentChildDownloadsBinding>(
         observe(downloadViewModel.childCards) { cards ->
             when (cards) {
                 is Resource.Success -> {
-                    if (cards.value.isEmpty()) {
-                        dispatchBackPressed()
+                    val items = cards.value
+                    (binding.downloadChildList.adapter as? DownloadAdapter)?.submitList(items)
+                    val isEmpty = items.isEmpty()
+                    binding.emptyChildDownloadsView.isVisible = isEmpty
+                    binding.downloadChildList.isVisible = !isEmpty
+                    if (isEmpty && hasLoadedDataOnce) {
+                        view?.post { dispatchBackPressed() }
+                    } else if (items.isNotEmpty()) {
+                        hasLoadedDataOnce = true
                     }
-                    (binding.downloadChildList.adapter as? DownloadAdapter)?.submitList(cards.value)
+                }
+
+                is Resource.Loading -> {
+                    binding.emptyChildDownloadsView.isVisible = false
                 }
 
                 else -> {
                     (binding.downloadChildList.adapter as? DownloadAdapter)?.submitList(null)
+                    binding.emptyChildDownloadsView.isVisible = true
+                    binding.downloadChildList.isVisible = false
                 }
             }
         }

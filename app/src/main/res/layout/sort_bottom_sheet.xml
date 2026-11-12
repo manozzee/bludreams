@@ -17,10 +17,9 @@
                 android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="10dp"
-                android:textStyle="bold"
+                android:textAppearance="@style/TextAppearance.CloudStream.SectionHeader"
                 android:text="@string/pick_source"
                 android:textSize="20sp"
-                android:textColor="?attr/textColor"
                 android:layout_width="match_parent"
                 android:layout_rowWeight="1"
                 android:layout_height="wrap_content" />
@@ -49,10 +48,9 @@
                 android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="10dp"
-                android:textStyle="bold"
+                android:textAppearance="@style/TextAppearance.CloudStream.SectionHeader"
                 android:text="@string/pick_subtitle"
                 android:textSize="20sp"
-                android:textColor="?attr/textColor"
                 android:layout_rowWeight="1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />

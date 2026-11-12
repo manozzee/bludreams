@@ -34,10 +34,8 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/pick_source"
-                    android:textColor="?attr/textColor"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="@style/TextAppearance.CloudStream.SectionHeader"
+                    android:text="@string/pick_source" />
 
                 <TextView
                     android:id="@+id/source_settings_btt"
@@ -88,10 +86,8 @@
                         android:id="@+id/subtitles_text"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/pick_subtitle"
-                        android:textColor="?attr/textColor"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
+                        android:textAppearance="@style/TextAppearance.CloudStream.SectionHeader"
+                        android:text="@string/pick_subtitle" />
 
                     <TextView
                         android:id="@+id/subtitles_encoding_format"

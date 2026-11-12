@@ -468,7 +468,10 @@ private fun BaseSettingsItem(
         widget(this)
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+            ),
         )
     }
 }

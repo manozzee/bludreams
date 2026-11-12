@@ -189,8 +189,8 @@ https://developer.android.com/design/ui/tv/samples/jet-fit
                     android:gravity="center_vertical"
                     android:singleLine="true"
                     android:textColor="?attr/textColor"
-                    android:textSize="25sp"
-                    android:textStyle="bold"
+                    android:textAppearance="@style/TextAppearance.CloudStream.Headline"
+                    android:textSize="24sp"
                     tools:text="The Perfect Run The Perfect Run" />
 
                 <TextView

@@ -180,50 +180,24 @@
     </array>
 
     <string-array name="themes_overlay_names">
-        <item>Normalny</item>
-        <item>Żółty mniszek lekarski</item>
-        <item>Goździk różowy</item>
-        <item>Pomarańczowy</item>
-        <item>Ciemnozielony</item>
-        <item>Kasztanowaty</item>
-        <item>Ciemnoniebieski</item>
-        <item>Szary</item>
-        <item>Biały</item>
-        <item>Fajny niebieski</item>
-        <item>Brązowy</item>
-        <item>Niebieski</item>
-        <item>Czerwony</item>
-        <item>Fioletowy</item>
-        <item>Miętowy</item>
-        <item>Jasnozielony</item>
-        <item>Bananowy</item>
-        <item>Łososiowy</item>
-        <item>Świnko peppowy</item>
-        <item>Lawenda</item>
+        <item>Velvet Noir</item>
+        <item>Aura Brass</item>
+        <item>Smoked Cognac</item>
+        <item>Obsidian Pine</item>
+        <item>Fincher Teal</item>
+        <item>Midnight Lapis</item>
+        <item>Nocturne Violet</item>
         <item>Material You</item>
         <item>Material You (drugorzędny)</item>
     </string-array>
     <string-array name="themes_overlay_names_values">
-        <item>Normal</item>
-        <item>DandelionYellow</item>
-        <item>CarnationPink</item>
-        <item>Orange</item>
-        <item>DarkGreen</item>
-        <item>Maroon</item>
-        <item>NavyBlue</item>
-        <item>Grey</item>
-        <item>White</item>
-        <item>CoolBlue</item>
-        <item>Brown</item>
-        <item>Blue</item>
-        <item>Red</item>
-        <item>Purple</item>
-        <item>Green</item>
-        <item>GreenApple</item>
-        <item>Banana</item>
-        <item>Party</item>
-        <item>Pink</item>
-        <item>Lavender</item>
+        <item>VelvetNoir</item>
+        <item>AuraBrass</item>
+        <item>SmokedCognac</item>
+        <item>ObsidianPine</item>
+        <item>FincherTeal</item>
+        <item>MidnightLapis</item>
+        <item>NocturneViolet</item>
         <item>Monet</item>
         <item>Monet2</item>
     </string-array>

@@ -88,11 +88,11 @@ android {
         // We just use SIGNING_KEY_ALIAS here since it won't change
         // so won't kill the configuration cache.
         if (System.getenv("SIGNING_KEY_ALIAS") != null) {
-            create("prerelease") {
+            create("release") {
                 val tmpFilePath = System.getProperty("user.home") + "/work/_temp/keystore/"
-                val prereleaseStoreFile: File? = File(tmpFilePath).listFiles()?.first()
+                val releaseStoreFile: File? = File(tmpFilePath).listFiles()?.first()
 
-                storeFile = prereleaseStoreFile?.let { file(it) }
+                storeFile = releaseStoreFile?.let { file(it) }
                 storePassword = System.getenv("SIGNING_STORE_PASSWORD")
                 keyAlias = System.getenv("SIGNING_KEY_ALIAS")
                 keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
@@ -103,7 +103,7 @@ android {
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.lagradost.cloudstream3"
+        applicationId = "com.bludreams"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = libs.versions.versionCode.get().toInt()
@@ -147,6 +147,11 @@ android {
             isDebuggable = false
             isMinifyEnabled = false
             isShrinkResources = false
+            if (signingConfigs.names.contains("release")) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -166,17 +171,7 @@ android {
     productFlavors {
         create("stable") {
             dimension = "state"
-        }
-        create("prerelease") {
-            dimension = "state"
-            applicationIdSuffix = ".prerelease"
-            if (signingConfigs.names.contains("prerelease")) {
-                signingConfig = signingConfigs.getByName("prerelease")
-            } else {
-                logger.warn("No prerelease signing config!")
-            }
-            versionNameSuffix = "-PRE"
-            versionCode = (System.currentTimeMillis() / 60000).toInt()
+            isDefault = true
         }
     }
 
@@ -291,6 +286,9 @@ dependencies {
     implementation(libs.nicehttp) // HTTP Lib
 
     implementation(libs.bundles.compose)
+    implementation(libs.haze)
+    implementation(libs.kyant.backdrop)
+    implementation(libs.kyant.shapes)
     implementation(libs.activity.compose)
     implementation(libs.kotlinx.io.core) // Logcat parser
 
@@ -306,7 +304,7 @@ tasks.register<Jar>("androidSourcesJar") {
 tasks.register<Copy>("copyJar") {
     dependsOn("build", ":library:jvmJar")
     from(
-        "build/intermediates/compile_app_classes_jar/prereleaseDebug/bundlePrereleaseDebugClassesToCompileJar",
+        "build/intermediates/compile_app_classes_jar/stableDebug/bundleStableDebugClassesToCompileJar",
         "../library/build/libs"
     )
     into("build/app-classes")
@@ -343,7 +341,7 @@ dokka {
     moduleName = "App"
     dokkaSourceSets {
         configureEach {
-            suppress = name != "prereleaseDebug"
+            suppress = name != "stableDebug"
             analysisPlatform = KotlinPlatform.JVM
             displayName = "JVM"
             documentedVisibilities(

@@ -56,6 +56,7 @@
     <string name="app_name_download_path">Cloudstream</string>
     <string name="app_layout_key">app_layout_key</string>
     <string name="primary_color_key">primary_color_key</string>
+    <string name="pure_black_key">pure_black_key</string>
     <string name="restore_key">restore_key</string>
     <string name="backup_key">backup_key</string>
     <string name="automatic_backup_key">automatic_backup_key</string>

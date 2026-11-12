@@ -22,10 +22,9 @@
             android:paddingTop="10dp"
             android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
             android:paddingBottom="10dp"
+            android:textAppearance="@style/TextAppearance.CloudStream.SectionHeader"
             android:text="@string/source_priority"
-            android:textColor="?attr/textColor"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:textSize="20sp" />
 
         <TextView
             android:id="@+id/currently_selected_profile_text"

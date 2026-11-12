@@ -100,63 +100,17 @@ internal fun darkScheme() = CloudStreamColorScheme(
 
 internal fun amoledScheme() = darkScheme().copy(
     background = CloudStreamPalette.AmoledBlack,
-    surface = CloudStreamPalette.AmoledBlack,
-    surfaceVariant = CloudStreamPalette.AmoledBlack,
-    surfaceContainer = CloudStreamPalette.AmoledBlack,
+    surface = CloudStreamPalette.AmoledElevated,
+    surfaceVariant = CloudStreamPalette.AmoledCard,
+    surfaceContainer = CloudStreamPalette.AmoledElevated,
 )
 
-internal fun amoledLightScheme() = amoledScheme().copy(
-    surfaceVariant = CloudStreamPalette.AmoledNearBlack,
-)
+internal fun amoledLightScheme() = amoledScheme()
 
-internal fun lightScheme() = CloudStreamColorScheme(
-    background = CloudStreamPalette.LightBlackBg,
-    surfaceVariant = CloudStreamPalette.LightPrimaryGrayBg,
-    surface = CloudStreamPalette.LightIconGrayBg,
-    surfaceContainer = CloudStreamPalette.LightBoxItemBg,
-    onBackground = CloudStreamPalette.LightText,
-    onSurfaceVariant = CloudStreamPalette.LightGrayText,
-    icon = CloudStreamPalette.LightIcon,
-    primary = CloudStreamPalette.Primary,
-    ongoing = CloudStreamPalette.Ongoing,
-    isLight = true,
-)
+internal fun lightScheme() = darkScheme()
 
-internal fun draculaScheme() = CloudStreamColorScheme(
-    background = CloudStreamPalette.DraculaBlackBg,
-    surfaceVariant = CloudStreamPalette.DraculaPrimaryGrayBg,
-    surface = CloudStreamPalette.DraculaIconGrayBg,
-    surfaceContainer = CloudStreamPalette.DraculaBoxItemBg,
-    onBackground = CloudStreamPalette.DraculaText,
-    onSurfaceVariant = CloudStreamPalette.DraculaGrayText,
-    icon = CloudStreamPalette.DraculaIcon,
-    primary = CloudStreamPalette.Primary,
-    ongoing = CloudStreamPalette.Ongoing,
-    isLight = false,
-)
+internal fun draculaScheme() = darkScheme()
 
-internal fun lavenderScheme() = CloudStreamColorScheme(
-    background = CloudStreamPalette.LavenderBlackBg,
-    surfaceVariant = CloudStreamPalette.LavenderPrimaryGrayBg,
-    surface = CloudStreamPalette.LavenderIconGrayBg,
-    surfaceContainer = CloudStreamPalette.LavenderBoxItemBg,
-    onBackground = CloudStreamPalette.LavenderText,
-    onSurfaceVariant = CloudStreamPalette.LavenderGrayText,
-    icon = CloudStreamPalette.LavenderIcon,
-    primary = CloudStreamPalette.Primary,
-    ongoing = CloudStreamPalette.Ongoing,
-    isLight = true,
-)
+internal fun lavenderScheme() = darkScheme()
 
-internal fun silentBlueScheme() = CloudStreamColorScheme(
-    background = CloudStreamPalette.SilentBlueBlackBg,
-    surfaceVariant = CloudStreamPalette.SilentBluePrimaryGrayBg,
-    surface = CloudStreamPalette.SilentBlueIconGrayBg,
-    surfaceContainer = CloudStreamPalette.SilentBlueBoxItemBg,
-    onBackground = CloudStreamPalette.SilentBlueText,
-    onSurfaceVariant = CloudStreamPalette.SilentBlueGrayText,
-    icon = CloudStreamPalette.SilentBlueIcon,
-    primary = CloudStreamPalette.Primary,
-    ongoing = CloudStreamPalette.Ongoing,
-    isLight = false,
-)
+internal fun silentBlueScheme() = darkScheme()

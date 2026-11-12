@@ -53,6 +53,7 @@
                     android:textColor="?attr/textColor"
                     android:textSize="18sp"
                     android:textStyle="normal"
+                    android:fontFamily="@font/outfit_semibold"
                     tools:text="Quick Brown Fox" />
             </LinearLayout>
 

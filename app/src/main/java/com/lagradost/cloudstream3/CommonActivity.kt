@@ -317,81 +317,58 @@ object CommonActivity {
     }
 
     fun updateTheme(act: Activity) {
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(act)
-        if (settingsManager
-                .getString(act.getString(R.string.app_theme_key), "AmoledLight") == "System"
-            && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-        ) {
-            loadThemes(act)
-        }
+        // Enforce dark mode permanently; no-op for system theme tracking
     }
 
-    private fun mapSystemTheme(act: Activity): Int {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val currentNightMode =
-                act.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-            return when (currentNightMode) {
-                Configuration.UI_MODE_NIGHT_NO -> R.style.LightMode // Night mode is not active, we're using the light theme
-                else -> R.style.AppTheme // Night mode is active, we're using dark theme
-            }
-        } else {
-            return R.style.AppTheme
-        }
+    fun isPureBlack(act: Context): Boolean {
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(act)
+        return settingsManager.getBoolean(act.getString(R.string.pure_black_key), false)
+            || settingsManager.getString(act.getString(R.string.app_theme_key), "") == "Amoled"
     }
 
     fun loadThemes(act: Activity?) {
         if (act == null) return
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(act)
+        val pureBlack = isPureBlack(act)
 
-        val currentTheme =
-            when (settingsManager.getString(act.getString(R.string.app_theme_key), "AmoledLight")) {
-                "System" -> mapSystemTheme(act)
-                "Black" -> R.style.AppTheme
-                "Light" -> R.style.LightMode
-                "Amoled" -> R.style.AmoledMode
-                "AmoledLight" -> R.style.AmoledModeLight
-                "Monet" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                    R.style.MonetMode else R.style.AppTheme
-
-                "Dracula" -> R.style.DraculaMode
-                "Lavender" -> R.style.LavenderMode
-                "SilentBlue" -> R.style.SilentBlueMode
-
-                else -> R.style.AppTheme
-            }
+        val currentTheme = if (pureBlack) {
+            R.style.AmoledMode
+        } else {
+            R.style.AppTheme
+        }
 
         val currentOverlayTheme =
-            when (settingsManager.getString(act.getString(R.string.primary_color_key), "Normal")) {
-                "Normal" -> R.style.OverlayPrimaryColorNormal
-                "DandelionYellow" -> R.style.OverlayPrimaryColorDandelionYellow
-                "CarnationPink" -> R.style.OverlayPrimaryColorCarnationPink
-                "Orange" -> R.style.OverlayPrimaryColorOrange
-                "DarkGreen" -> R.style.OverlayPrimaryColorDarkGreen
-                "Maroon" -> R.style.OverlayPrimaryColorMaroon
-                "NavyBlue" -> R.style.OverlayPrimaryColorNavyBlue
-                "Grey" -> R.style.OverlayPrimaryColorGrey
-                "White" -> R.style.OverlayPrimaryColorWhite
-                "CoolBlue" -> R.style.OverlayPrimaryColorCoolBlue
-                "Brown" -> R.style.OverlayPrimaryColorBrown
-                "Purple" -> R.style.OverlayPrimaryColorPurple
-                "Green" -> R.style.OverlayPrimaryColorGreen
-                "GreenApple" -> R.style.OverlayPrimaryColorGreenApple
-                "Red" -> R.style.OverlayPrimaryColorRed
-                "Banana" -> R.style.OverlayPrimaryColorBanana
-                "Party" -> R.style.OverlayPrimaryColorParty
-                "Pink" -> R.style.OverlayPrimaryColorPink
-                "Lavender" -> R.style.OverlayPrimaryColorLavender
+            when (settingsManager.getString(act.getString(R.string.primary_color_key), "VelvetNoir")) {
+                "VelvetNoir" -> R.style.OverlayPrimaryColorVelvetNoir
+                "AuraBrass" -> R.style.OverlayPrimaryColorAuraBrass
+                "SmokedCognac" -> R.style.OverlayPrimaryColorSmokedCognac
+                "ObsidianPine" -> R.style.OverlayPrimaryColorObsidianPine
+                "FincherTeal" -> R.style.OverlayPrimaryColorFincherTeal
+                "MidnightLapis" -> R.style.OverlayPrimaryColorMidnightLapis
+                "NocturneViolet" -> R.style.OverlayPrimaryColorNocturneViolet
                 "Monet" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                    R.style.OverlayPrimaryColorMonet else R.style.OverlayPrimaryColorNormal
+                    R.style.OverlayPrimaryColorMonet else R.style.OverlayPrimaryColorVelvetNoir
 
                 "Monet2" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-                    R.style.OverlayPrimaryColorMonetTwo else R.style.OverlayPrimaryColorNormal
+                    R.style.OverlayPrimaryColorMonetTwo else R.style.OverlayPrimaryColorVelvetNoir
 
-                else -> R.style.OverlayPrimaryColorNormal
+                // Backwards compatibility mappings for older saved keys
+                "Normal", "Red", "Maroon" -> R.style.OverlayPrimaryColorVelvetNoir
+                "DandelionYellow", "Banana" -> R.style.OverlayPrimaryColorAuraBrass
+                "Orange", "Brown" -> R.style.OverlayPrimaryColorSmokedCognac
+                "Green", "GreenApple", "DarkGreen" -> R.style.OverlayPrimaryColorObsidianPine
+                "CoolBlue", "Blue" -> R.style.OverlayPrimaryColorFincherTeal
+                "NavyBlue" -> R.style.OverlayPrimaryColorMidnightLapis
+                "Purple", "Lavender", "Pink", "Party", "CarnationPink" -> R.style.OverlayPrimaryColorNocturneViolet
+
+                else -> R.style.OverlayPrimaryColorVelvetNoir
             }
 
         act.theme.applyStyle(currentTheme, true)
         act.theme.applyStyle(currentOverlayTheme, true)
+        if (pureBlack) {
+            act.theme.applyStyle(R.style.AmoledMode, true)
+        }
         appliedTheme = currentTheme
         appliedColor = currentOverlayTheme
         act.updateTv()
@@ -400,6 +377,7 @@ object CommonActivity {
             R.style.LoadedStyle,
             true
         ) // THEME IS SET BEFORE VIEW IS CREATED TO APPLY THE THEME TO THE MAIN VIEW
+        act.window?.setBackgroundDrawableResource(if (pureBlack) R.color.black else R.color.primaryBlackBackground)
     }
 
     /** because we want closes find, aka when multiple have the same id, we go to parent

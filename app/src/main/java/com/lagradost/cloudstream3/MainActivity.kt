@@ -10,6 +10,12 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
+import android.view.ViewConfiguration
+import kotlin.math.abs
 import android.util.AttributeSet
 import android.util.Log
 import android.view.Gravity
@@ -62,12 +68,43 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.common.collect.Comparators.min
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
 import com.lagradost.cloudstream3.APIHolder.allProviders
+import com.lagradost.cloudstream3.ui.APIRepository.Companion.noneApi
 import com.lagradost.cloudstream3.APIHolder.apis
 import com.lagradost.cloudstream3.APIHolder.initAll
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.getKey
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.removeKey
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.setKey
 import com.lagradost.cloudstream3.CommonActivity.loadThemes
+import com.lagradost.cloudstream3.BuildConfig
+import android.view.ViewTreeObserver
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassIcons
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassSettingsRepository
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.nativeCanvas
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.lagradost.cloudstream3.ui.liquidglass.FloatingNavigationBar
+import com.lagradost.cloudstream3.ui.liquidglass.FloatingNavigationItem
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import com.lagradost.cloudstream3.ui.liquidglass.LocalLiquidGlassDrawTick
+import com.lagradost.cloudstream3.ui.liquidglass.isLiquidGlassBackdropSupported
+import com.lagradost.cloudstream3.ui.liquidglass.liquidGlassSource
+import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.lagradost.cloudstream3.CommonActivity.onColorSelectedEvent
 import com.lagradost.cloudstream3.CommonActivity.onDialogDismissedEvent
 import com.lagradost.cloudstream3.CommonActivity.onUserLeaveHint
@@ -181,6 +218,7 @@ import com.lagradost.cloudstream3.utils.setTextHtml
 import com.lagradost.cloudstream3.utils.txt
 import com.lagradost.cloudstream4.compose.CloudStreamThemeAppSettings
 import com.lagradost.cloudstream4.theme.CloudStreamTheme
+import androidx.compose.material3.MaterialTheme
 import com.lagradost.safefile.SafeFile
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -198,6 +236,14 @@ import kotlin.system.exitProcess
 
 class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCallback {
     companion object {
+        val ROOT_NAVIGATION_DESTINATIONS = setOf(
+            R.id.navigation_home,
+            R.id.navigation_search,
+            R.id.navigation_library,
+            R.id.navigation_downloads,
+            R.id.navigation_settings,
+        )
+
         var activityResultLauncher: ActivityResultLauncher<Intent>? = null
 
         const val TAG = "MAINACT"
@@ -501,26 +547,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 R.id.navigation_player
             ).contains(destination.id)
 
-        val isNavVisible = listOf(
-            R.id.navigation_home,
-            R.id.navigation_search,
-            R.id.navigation_library,
-            R.id.navigation_downloads,
-            R.id.navigation_settings,
-            R.id.navigation_download_child,
-            R.id.navigation_download_queue,
-            R.id.navigation_subtitles,
-            R.id.navigation_chrome_subtitles,
-            R.id.navigation_settings_player,
-            R.id.navigation_settings_updates,
-            R.id.navigation_settings_ui,
-            R.id.navigation_settings_account,
-            R.id.navigation_settings_providers,
-            R.id.navigation_settings_general,
-            R.id.navigation_settings_extensions,
-            R.id.navigation_settings_plugins,
-            R.id.navigation_test_providers,
-        ).contains(destination.id)
+        val isNavVisible = ROOT_NAVIGATION_DESTINATIONS.contains(destination.id)
 
 
         /*val dontPush = listOf(
@@ -557,14 +584,15 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         }*/
 
         binding?.apply {
-            navRailView.isVisible = isNavVisible && isLandscape()
-            navView.isVisible = isNavVisible && !isLandscape()
+            navRailView.isVisible = isNavVisible && isLayout(TV or EMULATOR)
+            navView.isGone = true
+            liquidGlassBottomNavComposeView.isVisible = isNavVisible && !isLayout(TV or EMULATOR)
             navHostFragment.apply {
                 val marginPx = resources.getDimensionPixelSize(R.dimen.nav_rail_view_width)
                 layoutParams =
                     (navHostFragment.layoutParams as ViewGroup.MarginLayoutParams).apply {
                         marginStart =
-                            if (isNavVisible && isLandscape() && isLayout(TV or EMULATOR)) marginPx else 0
+                            if (isNavVisible && isLayout(TV or EMULATOR)) marginPx else 0
                     }
             }
 
@@ -579,8 +607,10 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     R.id.navigation_download_child,
                     R.id.navigation_download_queue
                 ) -> {
-                    navRailView.menu.findItem(R.id.navigation_downloads).isChecked = true
-                    navView.menu.findItem(R.id.navigation_downloads).isChecked = true
+                    (navRailView.menu.findItem(R.id.navigation_library)
+                        ?: navRailView.menu.findItem(R.id.navigation_downloads))?.isChecked = true
+                    (navView.menu.findItem(R.id.navigation_library)
+                        ?: navView.menu.findItem(R.id.navigation_downloads))?.isChecked = true
                 }
 
                 in listOf(
@@ -597,8 +627,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     R.id.navigation_settings_plugins,
                     R.id.navigation_test_providers
                 ) -> {
-                    navRailView.menu.findItem(R.id.navigation_settings).isChecked = true
-                    navView.menu.findItem(R.id.navigation_settings).isChecked = true
+                    navRailView.menu.findItem(R.id.navigation_settings)?.isChecked = true
+                    navView.menu.findItem(R.id.navigation_settings)?.isChecked = true
                 }
             }
         }
@@ -1199,7 +1229,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         loadThemes(this)
         enableEdgeToEdgeCompat()
-        setNavigationBarColorCompat(R.attr.primaryGrayBackground)
+        setNavigationBarColorCompat(R.attr.primaryBlackBackground)
         updateLocale()
         super.onCreate(savedInstanceState)
         try {
@@ -1707,6 +1737,203 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         val rippleColor = ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.1f))
 
+        val selectedTabIdState = mutableStateOf(
+            navController.currentDestination?.id?.let { destId ->
+                when (destId) {
+                    R.id.navigation_downloads,
+                    R.id.navigation_download_child,
+                    R.id.navigation_download_queue -> R.id.navigation_library
+                    in ROOT_NAVIGATION_DESTINATIONS -> destId
+                    else -> null
+                }
+            } ?: R.id.navigation_home
+        )
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            val mappedTabId = when (destination.id) {
+                R.id.navigation_downloads,
+                R.id.navigation_download_child,
+                R.id.navigation_download_queue -> R.id.navigation_library
+                in ROOT_NAVIGATION_DESTINATIONS -> destination.id
+                else -> null
+            }
+            if (mappedTabId != null) {
+                selectedTabIdState.value = mappedTabId
+            }
+        }
+
+        binding?.liquidGlassBottomNavComposeView?.setContent {
+            LiquidGlassTheme {
+                val hazeState = rememberHazeState()
+                val selectedId by selectedTabIdState
+                val navHostView = binding?.navHostFragment
+                val composeView = binding?.liquidGlassBottomNavComposeView
+                val drawTickState = remember { mutableIntStateOf(0) }
+                val windowBgColor = MaterialTheme.colorScheme.background
+                val navLoc = remember { IntArray(2) }
+                val composeLoc = remember { IntArray(2) }
+                val backdrop = rememberLayerBackdrop {
+                    @Suppress("UNUSED_VARIABLE")
+                    val tick = drawTickState.intValue
+                    drawRect(windowBgColor)
+                    if (navHostView != null && composeView != null && navHostView.width > 0 && navHostView.height > 0) {
+                        navHostView.getLocationInWindow(navLoc)
+                        composeView.getLocationInWindow(composeLoc)
+                        val offsetX = (navLoc[0] - composeLoc[0]).toFloat()
+                        val offsetY = (navLoc[1] - composeLoc[1]).toFloat()
+                        translate(left = offsetX, top = offsetY) {
+                            drawIntoCanvas { canvas ->
+                                navHostView.draw(canvas.nativeCanvas)
+                            }
+                        }
+                    }
+                }
+                val useLiquidGlass = isLiquidGlassBackdropSupported()
+
+                CompositionLocalProvider(LocalLiquidGlassDrawTick provides drawTickState) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (navHostView != null && composeView != null) {
+                            DisposableEffect(navHostView, composeView) {
+                                var preDrawStreak = 0
+                                val scrollListener = ViewTreeObserver.OnScrollChangedListener {
+                                    preDrawStreak = 0
+                                    drawTickState.intValue++
+                                }
+                                val globalLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
+                                    preDrawStreak = 0
+                                    drawTickState.intValue++
+                                }
+                                val preDrawListener = ViewTreeObserver.OnPreDrawListener {
+                                    if (preDrawStreak < 2) {
+                                        preDrawStreak++
+                                        drawTickState.intValue++
+                                    } else {
+                                        preDrawStreak = 0
+                                    }
+                                    true
+                                }
+                                val vto = composeView.viewTreeObserver
+                                vto.addOnScrollChangedListener(scrollListener)
+                                vto.addOnGlobalLayoutListener(globalLayoutListener)
+                                vto.addOnPreDrawListener(preDrawListener)
+                                onDispose {
+                                    val disposeVto = composeView.viewTreeObserver
+                                    if (disposeVto.isAlive) {
+                                        disposeVto.removeOnScrollChangedListener(scrollListener)
+                                        disposeVto.removeOnGlobalLayoutListener(globalLayoutListener)
+                                        disposeVto.removeOnPreDrawListener(preDrawListener)
+                                    }
+                                }
+                            }
+
+                            if (useLiquidGlass) {
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .liquidGlassSource(backdrop)
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .hazeSource(state = hazeState)
+                                        .drawBehind {
+                                            @Suppress("UNUSED_VARIABLE")
+                                            val tick = drawTickState.intValue
+                                            drawRect(windowBgColor)
+                                            if (navHostView.width > 0 && navHostView.height > 0) {
+                                                navHostView.getLocationInWindow(navLoc)
+                                                composeView.getLocationInWindow(composeLoc)
+                                                val offsetX = (navLoc[0] - composeLoc[0]).toFloat()
+                                                val offsetY = (navLoc[1] - composeLoc[1]).toFloat()
+                                                translate(left = offsetX, top = offsetY) {
+                                                    drawIntoCanvas { canvas ->
+                                                        navHostView.draw(canvas.nativeCanvas)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                )
+                            }
+                        }
+
+                        val floatingItems = remember(selectedId) {
+                            listOf(
+                                FloatingNavigationItem(
+                                    label = getString(R.string.title_home),
+                                    selected = selectedId == R.id.navigation_home,
+                                    onClick = {
+                                        if (selectedId != R.id.navigation_home) {
+                                            navController.navigate(R.id.navigation_home)
+                                        }
+                                    },
+                                    onLongClick = {
+                                        triggerHomeRefresh()
+                                    },
+                                    drawableRes = R.drawable.sidebar_home,
+                                    selectedDrawableRes = R.drawable.home_icon_filled_24,
+                                ),
+                                FloatingNavigationItem(
+                                    label = getString(R.string.title_search),
+                                    selected = selectedId == R.id.navigation_search,
+                                    onClick = {
+                                        if (selectedId != R.id.navigation_search) {
+                                            navController.navigate(R.id.navigation_search)
+                                        }
+                                    },
+                                    drawableRes = R.drawable.sidebar_search,
+                                    selectedDrawableRes = R.drawable.search_icon_filled,
+                                ),
+                                FloatingNavigationItem(
+                                    label = getString(R.string.library),
+                                    selected = selectedId == R.id.navigation_library,
+                                    onClick = {
+                                        if (selectedId != R.id.navigation_library) {
+                                            navController.navigate(R.id.navigation_library)
+                                        }
+                                    },
+                                    onLongClick = {
+                                        try {
+                                            val viewPager = binding?.root?.findViewById<ViewPager2?>(R.id.viewpager)
+                                            val children = (viewPager?.get(0) as? RecyclerView)?.children
+                                            if (children != null) {
+                                                for (child in children) {
+                                                    child.findViewById<RecyclerView?>(R.id.page_recyclerview)
+                                                        ?.smoothScrollToPosition(0)
+                                                }
+                                            }
+                                        } catch (_: Throwable) {
+                                        }
+                                    },
+                                    drawableRes = R.drawable.sidebar_library,
+                                    selectedDrawableRes = R.drawable.library_icon_filled,
+                                ),
+                                FloatingNavigationItem(
+                                    label = getString(R.string.title_settings),
+                                    selected = selectedId == R.id.navigation_settings,
+                                    onClick = {
+                                        if (selectedId != R.id.navigation_settings) {
+                                            navController.navigate(R.id.navigation_settings)
+                                        }
+                                    },
+                                    drawableRes = R.drawable.sidebar_settings,
+                                    selectedDrawableRes = R.drawable.settings_icon_filled,
+                                ),
+                            )
+                        }
+                        val navGlowEnabled by LiquidGlassSettingsRepository.glowEnabled.collectAsState()
+                        FloatingNavigationBar(
+                            items = floatingItems,
+                            hazeState = hazeState,
+                            backdrop = backdrop,
+                            glowEnabled = navGlowEnabled,
+                        )
+                    }
+                }
+            }
+        }
+
+        navController.currentDestination?.let { updateNavBar(it) }
+
         binding?.navView?.apply {
             itemRippleColor = rippleColor
             itemActiveIndicatorColor = rippleColor
@@ -1725,11 +1952,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 itemRippleColor = rippleColor
                 itemActiveIndicatorColor = rippleColor
             } else {
-                val rippleColor = ColorStateList.valueOf(getResourceColor(R.attr.textColor, 1.0f))
-                val rippleColorTransparent =
-                    ColorStateList.valueOf(getResourceColor(R.attr.textColor, 0.2f))
+                val subtleRipple = ColorStateList.valueOf(getResourceColor(android.R.attr.colorControlHighlight))
                 itemSpacing = 12.toPx // expandedItemSpacing does not have an attr
-                itemRippleColor = rippleColorTransparent
+                itemRippleColor = subtleRipple
                 itemActiveIndicatorColor = rippleColor
             }
             setupWithNavController(navController)
@@ -1757,95 +1982,74 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             }
             //noFocus(this)
 
-            val navProfileRoot = findViewById<LinearLayout>(R.id.nav_footer_root)
+            val navProfileRoot = findViewById<LinearLayout?>(R.id.nav_footer_root)
+            if (navProfileRoot != null) {
+                if (isLayout(TV or EMULATOR)) {
+                    val navProfilePic = findViewById<ImageView>(R.id.nav_footer_profile_pic)
+                    val navProfileCard = findViewById<CardView>(R.id.nav_footer_profile_card)
 
-            if (isLayout(TV or EMULATOR)) {
-                val navProfilePic = findViewById<ImageView>(R.id.nav_footer_profile_pic)
-                val navProfileCard = findViewById<CardView>(R.id.nav_footer_profile_card)
-
-                navProfileCard?.setOnClickListener {
-                    showAccountSelectLinear()
-                }
-
-                val homeViewModel =
-                    ViewModelProvider(this@MainActivity)[HomeViewModel::class.java]
-
-                observe(homeViewModel.currentAccount) { currentAccount ->
-                    if (currentAccount != null) {
-                        navProfilePic?.loadImage(
-                            currentAccount.image
-                        )
-                        navProfileRoot.isVisible = true
-                    } else {
-                        navProfileRoot.isGone = true
+                    navProfileCard?.setOnClickListener {
+                        showAccountSelectLinear()
                     }
+
+                    val homeViewModel =
+                        ViewModelProvider(this@MainActivity)[HomeViewModel::class.java]
+
+                    observe(homeViewModel.currentAccount) { currentAccount ->
+                        if (currentAccount != null) {
+                            navProfilePic?.loadImage(
+                                currentAccount.image
+                            )
+                            navProfileRoot.isVisible = true
+                        } else {
+                            navProfileRoot.isGone = true
+                        }
+                    }
+                } else {
+                    navProfileRoot.isGone = true
                 }
-            } else {
-                navProfileRoot.isGone = true
             }
         }
 
         val rail = binding?.navRailView
         if (rail != null) {
-            binding?.navRailView?.labelVisibilityMode =
-                NavigationRailView.LABEL_VISIBILITY_UNLABELED
-            //val focus = mutableSetOf<Int>()
+            try {
+                binding?.navRailView?.labelVisibilityMode =
+                    NavigationRailView.LABEL_VISIBILITY_UNLABELED
+                //val focus = mutableSetOf<Int>()
 
-            var prevId: Int? = null
-            var prevView: View? = null
+                var prevId: Int? = null
+                var prevView: View? = null
 
-            // The genius engineers at google did not actually 
-            // write a nextFocus for the navrail
-            rail.findViewById<View?>(R.id.navigation_settings)?.nextFocusDownId =
-                R.id.nav_footer_profile_card
-            for (id in arrayOf(
-                R.id.navigation_home,
-                R.id.navigation_search,
-                R.id.navigation_library,
-                R.id.navigation_downloads,
-                R.id.navigation_settings
-            )) {
-                val view = rail.findViewById<View?>(id) ?: continue
-                prevId?.let { view.nextFocusUpId = it }
-                prevView?.nextFocusDownId = id
+                // The genius engineers at google did not actually 
+                // write a nextFocus for the navrail
+                rail.findViewById<View?>(R.id.navigation_settings)?.let {
+                    it.nextFocusDownId = R.id.nav_footer_profile_card
+                }
+                for (id in arrayOf(
+                    R.id.navigation_home,
+                    R.id.navigation_search,
+                    R.id.navigation_library,
+                    R.id.navigation_downloads,
+                    R.id.navigation_settings
+                )) {
+                    val view = rail.findViewById<View?>(id) ?: continue
+                    prevId?.let { view.nextFocusUpId = it }
+                    prevView?.nextFocusDownId = id
 
-                prevView = view
-                prevId = id
-                // Uncomment for focus expand
-                /*if (!isLayout(TV)) {
-                    view.onFocusChangeListener = null
-                } else {
-                    view.onFocusChangeListener =
-                        View.OnFocusChangeListener { v, hasFocus ->
-                            if (hasFocus) {
-                                focus += id
-                                binding?.navRailView?.labelVisibilityMode =
-                                    NavigationRailView.LABEL_VISIBILITY_LABELED
-                                binding?.navRailView?.expand()
-                            } else {
-                                focus -= id
-                                v.post {
-                                    if (focus.isEmpty()) {
-                                        binding?.navRailView?.labelVisibilityMode =
-                                            NavigationRailView.LABEL_VISIBILITY_UNLABELED
-                                        binding?.navRailView?.collapse()
-                                    }
-                                }
-                            }
-                        }
-                }*/
-            }
+                    prevView = view
+                    prevId = id
+                }
+            } catch (_: Throwable) {}
         }
 
-        // Navigation button long click functionality to scroll to top
-        for (view in listOf(binding?.navView, binding?.navRailView)) {
-            view?.findViewById<View?>(R.id.navigation_home)?.setOnLongClickListener {
-                val recycler = binding?.root?.findViewById<RecyclerView?>(R.id.home_master_recycler)
-                recycler?.smoothScrollToPosition(0)
-                return@setOnLongClickListener recycler != null
+        // Navigation button long click functionality
+        for (view in listOfNotNull(binding?.navView, binding?.navRailView)) {
+            view.findViewById<View?>(R.id.navigation_home)?.let { homeItemView ->
+                setupHomeLongPressRefresh(homeItemView)
             }
 
-            view?.findViewById<View?>(R.id.navigation_library)?.setOnLongClickListener {
+            view.findViewById<View?>(R.id.navigation_library)?.setOnLongClickListener {
                 val viewPager = binding?.root?.findViewById<ViewPager2?>(R.id.viewpager)
                     ?: return@setOnLongClickListener false
                 try {
@@ -1885,6 +2089,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         loadCache()
         updateHasTrailers()
+
         /*nav_view.setOnNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.navigation_home -> {
@@ -2054,13 +2259,81 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 //        }
 
         attachBackPressedCallback("MainActivityDefault") {
-            setNavigationBarColorCompat(R.attr.primaryGrayBackground)
+            setNavigationBarColorCompat(R.attr.primaryBlackBackground)
             updateLocale()
             runDefault()
         }
 
         // Start the download queue
         DownloadQueueManager.init(this)
+    }
+
+    fun triggerHomeRefresh() {
+        try {
+            val homeViewModel = ViewModelProvider(this)[HomeViewModel::class.java]
+            val currentApi = homeViewModel.apiName.value ?: DataStoreHelper.currentHomePage ?: noneApi.name
+            homeViewModel.reloadStored()
+            homeViewModel.loadAndCancel(currentApi, forceReload = true, fromUI = true)
+            showToast(R.string.action_reload, Toast.LENGTH_SHORT)
+        } catch (e: Throwable) {
+            logError(e)
+        }
+    }
+
+    private fun setupHomeLongPressRefresh(navItemView: View) {
+        val handler = Handler(Looper.getMainLooper())
+        val touchSlop = ViewConfiguration.get(navItemView.context).scaledTouchSlop
+        var startX = 0f
+        var startY = 0f
+        var longPressed = false
+
+        val longPressRunnable = Runnable {
+            longPressed = true
+            navItemView.isPressed = false
+            navItemView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            triggerHomeRefresh()
+        }
+
+        navItemView.isLongClickable = false
+        navItemView.setOnLongClickListener(null)
+
+        navItemView.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = event.x
+                    startY = event.y
+                    longPressed = false
+                    handler.removeCallbacks(longPressRunnable)
+                    handler.postDelayed(longPressRunnable, 900L)
+                    false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = abs(event.x - startX)
+                    val dy = abs(event.y - startY)
+                    val inBounds = event.x >= -touchSlop && event.x <= v.width + touchSlop &&
+                            event.y >= -touchSlop && event.y <= v.height + touchSlop
+                    if (dx > touchSlop || dy > touchSlop || !inBounds) {
+                        handler.removeCallbacks(longPressRunnable)
+                    }
+                    false
+                }
+                MotionEvent.ACTION_UP -> {
+                    handler.removeCallbacks(longPressRunnable)
+                    if (longPressed) {
+                        v.isPressed = false
+                        true
+                    } else {
+                        false
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(longPressRunnable)
+                    longPressed = false
+                    false
+                }
+                else -> false
+            }
+        }
     }
 
     /** Biometric stuff **/

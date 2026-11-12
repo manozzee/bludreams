@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_marginTop="@dimen/navbar_height"
-    android:background="?attr/primaryGrayBackground"
+    android:background="?attr/primaryBlackBackground"
     tools:context=".ui.search.SearchFragment">
 
     <LinearLayout
@@ -14,161 +14,183 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingBottom="10dp"
-        android:background="?attr/primaryGrayBackground">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            app:layout_scrollFlags="scroll|enterAlways">
+            android:orientation="vertical"
+            android:paddingBottom="8dp">
+
+            <!-- Prominent Search Heading at top-left -->
+            <TextView
+                android:id="@+id/search_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="10dp"
+                android:textAppearance="@style/TextAppearance.CloudStream.Headline"
+                android:text="@string/search"
+                android:textColor="@color/white"
+                android:textSize="24sp" />
+
+            <!-- Modern unified Compose search header (exact Settings & Library pill UI + circular buttons) -->
+            <androidx.compose.ui.platform.ComposeView
+                android:id="@+id/search_header_compose_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Category selection chips below action icons -->
+            <include
+                android:id="@+id/tvtypes_chips_scroll"
+                layout="@layout/tvtypes_chips_scroll" />
+        </LinearLayout>
+
+        <com.lagradost.cloudstream3.ui.AutofitRecyclerView
+            android:id="@+id/search_autofit_results"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:descendantFocusability="afterDescendants"
+            android:nextFocusLeft="@id/nav_rail_view"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="120dp"
+            android:visibility="gone"
+            app:spanCount="3"
+            tools:listitem="@layout/search_result_grid" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/search_master_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="120dp"
+            android:descendantFocusability="afterDescendants"
+            android:nextFocusLeft="@id/nav_rail_view"
+            android:nextFocusUp="@id/tvtypes_chips"
+            android:visibility="gone"
+            tools:listitem="@layout/homepage_parent" />
+
+        <!-- Polished Empty State for History -->
+        <LinearLayout
+            android:id="@+id/search_history_empty_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:background="@drawable/circular_action_button_bg"
+                android:layout_marginBottom="16dp">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/history_toggle_off_24px"
+                    tools:ignore="ContentDescription"
+                    app:tint="?attr/textColor" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/no_search_history"
+                android:textAppearance="@style/TextAppearance.CloudStream.Title"
+                android:textColor="@color/white"
+                android:textSize="17sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/no_search_history_sub"
+                android:textColor="#80FFFFFF"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/search_history_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="6dp"
+            android:paddingBottom="120dp"
+            android:descendantFocusability="afterDescendants"
+            android:nextFocusLeft="@id/nav_rail_view"
+            android:nextFocusUp="@id/tvtypes_chips"
+            android:visibility="visible"
+            tools:listitem="@layout/search_history_item" />
+
+        <!-- Suggestions list in the content area below header -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/search_suggestions_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="6dp"
+            android:paddingBottom="120dp"
+            android:descendantFocusability="afterDescendants"
+            android:nextFocusLeft="@id/nav_rail_view"
+            android:nextFocusUp="@id/tvtypes_chips"
+            android:visibility="gone"
+            tools:listitem="@layout/search_suggestion_item" />
+    </LinearLayout>
+
+    <!-- Legacy view references preserved for ViewBinding compatibility -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        tools:ignore="UselessParent">
+
+        <FrameLayout
+            android:id="@+id/search_field_container"
+            android:layout_width="0dp"
+            android:layout_height="0dp">
+
+            <androidx.appcompat.widget.SearchView
+                android:id="@+id/main_search"
+                android:layout_width="0dp"
+                android:layout_height="0dp">
+
+                <androidx.core.widget.ContentLoadingProgressBar
+                    android:id="@+id/search_loading_bar"
+                    style="@style/Widget.AppCompat.ProgressBar"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+            </androidx.appcompat.widget.SearchView>
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/voice_search_container"
+            android:layout_width="0dp"
+            android:layout_height="0dp">
 
             <ImageView
                 android:id="@+id/voice_search"
-                android:layout_width="25dp"
-                android:layout_height="25dp"
-                android:layout_gravity="end|center_vertical"
-                android:layout_marginStart="10dp"
-                android:background="?selectableItemBackgroundBorderless"
-                android:contentDescription="@string/change_providers_img_des"
-                android:src="@drawable/ic_mic"
-                app:tint="?attr/textColor" />
+                android:layout_width="0dp"
+                android:layout_height="0dp" />
+        </FrameLayout>
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:layout_margin="10dp"
-                android:background="@drawable/search_background"
-                android:visibility="visible">
+        <FrameLayout
+            android:id="@+id/search_filter_container"
+            android:layout_width="0dp"
+            android:layout_height="0dp">
 
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="30dp"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginEnd="30dp">
-
-                    <androidx.appcompat.widget.SearchView
-                        android:id="@+id/main_search"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_gravity="center_vertical"
-
-                        android:iconifiedByDefault="false"
-                        android:imeOptions="actionSearch"
-
-                        android:inputType="text"
-                        android:nextFocusLeft="@id/nav_rail_view"
-
-                        android:nextFocusRight="@id/search_filter"
-                        android:nextFocusUp="@id/nav_rail_view"
-                        android:nextFocusDown="@id/search_autofit_results"
-                        android:paddingStart="-10dp"
-                        app:iconifiedByDefault="false"
-                        app:queryBackground="@color/transparent"
-                        app:queryHint="@string/search_hint"
-                        app:searchIcon="@drawable/search_icon"
-                        app:closeIcon="@drawable/ic_baseline_close_24"
-                        tools:ignore="RtlSymmetry">
-
-                        <requestFocus />
-
-                        <androidx.core.widget.ContentLoadingProgressBar
-                            android:id="@+id/search_loading_bar"
-                            style="@style/Widget.AppCompat.ProgressBar"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_gravity="center"
-                            android:layout_marginStart="-35dp"
-                            android:foregroundTint="@color/white"
-                            android:progressTint="@color/white">
-
-                        </androidx.core.widget.ContentLoadingProgressBar>
-                        <!--app:queryHint="@string/search_hint"
-                        android:background="@color/grayBackground" @color/itemBackground
-                                    app:searchHintIcon="@drawable/search_white"
-                                    -->
-                    </androidx.appcompat.widget.SearchView>
-                </FrameLayout>
-
-                <ImageView
-                    android:id="@+id/search_filter"
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:layout_gravity="end|center_vertical"
-
-                    android:layout_margin="10dp"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/change_providers_img_des"
-                    android:nextFocusLeft="@id/main_search"
-                    android:nextFocusRight="@id/main_search"
-                    android:nextFocusUp="@id/nav_rail_view"
-                    android:nextFocusDown="@id/search_autofit_results"
-                    android:src="@drawable/ic_baseline_tune_24"
-                    app:tint="?attr/textColor" />
-            </FrameLayout>
-        </LinearLayout>
-
-        <include
-            android:id="@+id/tvtypes_chips_scroll"
-            layout="@layout/tvtypes_chips_scroll" />
+            <ImageView
+                android:id="@+id/search_filter"
+                android:layout_width="0dp"
+                android:layout_height="0dp" />
+        </FrameLayout>
     </LinearLayout>
-
-
-    <com.lagradost.cloudstream3.ui.AutofitRecyclerView
-        android:id="@+id/search_autofit_results"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-
-        android:background="?attr/primaryBlackBackground"
-        android:clipToPadding="false"
-        android:descendantFocusability="afterDescendants"
-        android:nextFocusLeft="@id/nav_rail_view"
-        android:orientation="vertical"
-        android:paddingStart="8dp"
-        android:paddingTop="5dp"
-        android:paddingEnd="8dp"
-        android:visibility="gone"
-        app:spanCount="3"
-        tools:listitem="@layout/search_result_grid" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/search_master_recycler"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-
-        android:background="?attr/primaryBlackBackground"
-        android:descendantFocusability="afterDescendants"
-
-        android:nextFocusLeft="@id/nav_rail_view"
-        android:nextFocusUp="@id/tvtypes_chips"
-        android:visibility="gone"
-        tools:listitem="@layout/homepage_parent" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/search_history_recycler"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="?attr/primaryBlackBackground"
-        android:descendantFocusability="afterDescendants"
-        android:nextFocusLeft="@id/nav_rail_view"
-        android:nextFocusUp="@id/tvtypes_chips"
-        android:visibility="visible"
-        tools:listitem="@layout/search_history_item" />
-    </LinearLayout>
-
-    <!-- Suggestions overlay - appears on top of content -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/search_suggestions_recycler"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="100dp"
-        android:background="?attr/primaryGrayBackground"
-        android:elevation="8dp"
-        android:visibility="gone"
-        tools:listitem="@layout/search_suggestion_item" />
 
 </FrameLayout>

@@ -11,9 +11,9 @@ internal actual object DeviceTheme {
 
     @Composable
     @ReadOnlyComposable
-    actual fun resolveDynamicPrimaryColor(): Color = CloudStreamPrimaryColor.NORMAL.color
+    actual fun resolveDynamicPrimaryColor(): Color = CloudStreamPrimaryColor.VELVET_NOIR.color
 
     @Composable
     @ReadOnlyComposable
-    actual fun resolveDynamicSecondaryColor(): Color = CloudStreamPrimaryColor.NORMAL.color
+    actual fun resolveDynamicSecondaryColor(): Color = CloudStreamPrimaryColor.VELVET_NOIR.color
 }

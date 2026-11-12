@@ -14,12 +14,18 @@ import android.view.animation.AlphaAnimation
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.widget.SearchView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.stringResource
 import androidx.core.view.allViews
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
@@ -38,9 +44,16 @@ import com.lagradost.cloudstream3.mvvm.observe
 import com.lagradost.cloudstream3.syncproviders.SyncAPI
 import com.lagradost.cloudstream3.syncproviders.SyncIdName
 import com.lagradost.cloudstream3.ui.AutofitRecyclerView
-import com.lagradost.cloudstream3.ui.quicksearch.QuickSearchFragment
-import com.lagradost.cloudstream3.utils.txt
 import com.lagradost.cloudstream3.ui.BaseFragment
+import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassCategoryChips
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassLibraryHeader
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import com.lagradost.cloudstream3.ui.poster.PosterCardStyleRepository
+import com.lagradost.cloudstream3.ui.quicksearch.QuickSearchFragment
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_SHOW_METADATA
 import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
@@ -53,6 +66,8 @@ import com.lagradost.cloudstream3.utils.DataStoreHelper.currentAccount
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
 import com.lagradost.cloudstream3.utils.UIHelper.fixSystemBarsPadding
 import com.lagradost.cloudstream3.utils.UIHelper.getSpanCount
+import com.lagradost.cloudstream3.utils.UIHelper.navigate
+import com.lagradost.cloudstream3.utils.txt
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.concurrent.CopyOnWriteArrayList
@@ -96,6 +111,112 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
 
     private var toggleRandomButton = false
 
+    private val tabTitlesState = mutableStateOf<List<String>>(emptyList())
+    private val selectedTabState = mutableIntStateOf(0)
+    private val sortOptionsState = mutableStateOf<List<String>>(emptyList())
+    private val selectedSortState = mutableIntStateOf(-1)
+    private val sourceNameState = mutableStateOf<String?>(null)
+    private val isSearchOpenState = mutableStateOf(false)
+    private val searchQueryState = mutableStateOf("")
+
+    private val searchHandler = Handler(Looper.getMainLooper())
+    private val searchRunnable = Runnable {
+        libraryViewModel.sort(ListSorting.Query, searchQueryState.value)
+    }
+
+    private fun hideViewpager(distance: Int) {
+        if (distance < 3) return
+        val viewpager = binding?.viewpager ?: return
+        val hideAnimation = AlphaAnimation(1f, 0f).apply {
+            duration = distance * 50L
+            fillAfter = true
+        }
+        val showAnimation = AlphaAnimation(0f, 1f).apply {
+            duration = distance * 50L
+            startOffset = distance * 100L
+            fillAfter = true
+        }
+        viewpager.startAnimation(hideAnimation)
+        viewpager.startAnimation(showAnimation)
+    }
+
+    private fun showSourceSelectionDialog(context: Context) {
+        val items = libraryViewModel.availableApiNames
+        val currentItem = libraryViewModel.currentApiName.value
+
+        activity?.showBottomDialog(
+            items,
+            items.indexOf(currentItem),
+            txt(R.string.select_library).asString(context),
+            false,
+            {}
+        ) { index ->
+            val selectedItem = items.getOrNull(index) ?: return@showBottomDialog
+            libraryViewModel.switchList(selectedItem)
+        }
+    }
+
+    private fun showPluginSelectionDialog(
+        activity: Activity,
+        key: String,
+        syncId: SyncIdName,
+        apiName: String? = null,
+    ) {
+        val availableProviders = allProviders.filter {
+            it.supportedSyncNames.contains(syncId)
+        }.map { it.name } +
+            (APIHolder.getApiFromNameNull(apiName)?.let { listOf(it.name) }
+                ?: emptyList())
+
+        val baseOptions = listOf(
+            LibraryOpenerType.Default,
+            LibraryOpenerType.None,
+            LibraryOpenerType.Browser,
+            LibraryOpenerType.Search
+        )
+
+        val items = baseOptions.map { txt(it.stringRes).asString(activity) } + availableProviders
+
+        val savedSelection = getKey<LibraryOpener>("$currentAccount/$LIBRARY_FOLDER", key)
+        val selectedIndex =
+            when {
+                savedSelection == null -> 0
+                savedSelection.openType == LibraryOpenerType.Provider
+                        && savedSelection.providerData?.apiName != null -> {
+                    availableProviders.indexOf(savedSelection.providerData.apiName)
+                        .takeIf { it != -1 }
+                        ?.plus(baseOptions.size) ?: 0
+                }
+                else -> baseOptions.indexOf(savedSelection.openType)
+            }
+
+        activity.showBottomDialog(
+            items,
+            selectedIndex,
+            txt(R.string.open_with).asString(activity),
+            false,
+            {},
+        ) {
+            val savedData = if (it < baseOptions.size) {
+                LibraryOpener(
+                    baseOptions[it],
+                    null
+                )
+            } else {
+                LibraryOpener(
+                    LibraryOpenerType.Provider,
+                    ProviderLibraryData(items[it])
+                )
+            }
+
+            setKey(
+                "$currentAccount/$LIBRARY_FOLDER",
+                key,
+                savedData,
+            )
+        }
+    }
+
     override fun pickLayout(): Int? =
         if (isLayout(PHONE)) R.layout.fragment_library else R.layout.fragment_library_tv
 
@@ -136,62 +257,108 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
     ) {
         binding.sortFab.setOnClickListener(sortChangeClickListener)
         binding.librarySort.setOnClickListener(sortChangeClickListener)
-
-        binding.libraryRoot.findViewById<TextView>(androidx.appcompat.R.id.search_src_text)
-            ?.apply {
-                tag = "tv_no_focus_tag"
-                // Expand the Appbar when search bar is focused, fixing scroll up issue
-                setOnFocusChangeListener { _, _ ->
-                    binding.searchBar.setExpanded(true)
-                }
-            }
-
-        val searchCallback = Runnable {
-            val newText = binding.mainSearch.query.toString()
-            libraryViewModel.sort(ListSorting.Query, newText)
+        binding.libraryDownloadsBtt.setOnClickListener {
+            activity?.navigate(R.id.navigation_downloads)
         }
 
-        binding.mainSearch.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                libraryViewModel.sort(ListSorting.Query, query)
-                return true
-            }
+        if (isLayout(PHONE)) {
+            binding.libraryHeaderComposeView.apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                setContent {
+                    LiquidGlassTheme {
+                        val sourceName by sourceNameState
+                        val isSearchOpen by isSearchOpenState
+                        val searchQuery by searchQueryState
+                        val sortOptions by sortOptionsState
+                        val selectedSort by selectedSortState
 
-            // This is required to prevent the first text change
-            // When this is attached it'll immediately send a onQueryTextChange("")
-            // Which we do not want
-            var hasInitialized = false
-            override fun onQueryTextChange(newText: String?): Boolean {
-                if (!hasInitialized) {
-                    hasInitialized = true
-                    return true
+                        LiquidGlassLibraryHeader(
+                            title = stringResource(R.string.library),
+                            sourceName = sourceName,
+                            isSearchOpen = isSearchOpen,
+                            searchQuery = searchQuery,
+                            onToggleSearch = {
+                                val willOpen = !isSearchOpenState.value
+                                isSearchOpenState.value = willOpen
+                                if (willOpen) {
+                                    binding.searchBar.setExpanded(true)
+                                } else {
+                                    searchQueryState.value = ""
+                                    searchHandler.removeCallbacks(searchRunnable)
+                                    libraryViewModel.sort(ListSorting.Query, "")
+                                }
+                            },
+                            onSearchQueryChange = { newQuery ->
+                                searchQueryState.value = newQuery
+                                searchHandler.removeCallbacks(searchRunnable)
+                                searchHandler.postDelayed(searchRunnable, 300)
+                            },
+                            onSelectProvider = {
+                                val syncName = libraryViewModel.currentSyncApi?.syncIdName ?: return@LiquidGlassLibraryHeader
+                                val act = activity ?: return@LiquidGlassLibraryHeader
+                                showPluginSelectionDialog(act, syncName.name, syncName)
+                            },
+                            onSelectSource = {
+                                context?.let { showSourceSelectionDialog(it) }
+                            },
+                            onOpenDownloads = {
+                                activity?.navigate(R.id.navigation_downloads)
+                            },
+                            sortOptions = sortOptions,
+                            selectedSortIndex = selectedSort,
+                            onSelectSort = { index ->
+                                selectedSortState.intValue = index
+                                val method = libraryViewModel.sortingMethods.getOrNull(index) ?: return@LiquidGlassLibraryHeader
+                                libraryViewModel.sort(method)
+                            },
+                        )
+                    }
                 }
-
-                binding.mainSearch.removeCallbacks(searchCallback)
-
-                // Delay the execution of the search operation by 1 second (adjust as needed)
-                // this prevents running search when the user is typing
-                binding.mainSearch.postDelayed(searchCallback, 1000)
-
-                return true
             }
-        })
+
+            binding.libraryTabsComposeView.apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                setContent {
+                    LiquidGlassTheme {
+                        val titles by tabTitlesState
+                        val selectedTab by selectedTabState
+
+                        LiquidGlassCategoryChips(
+                            titles = titles,
+                            selectedIndex = selectedTab,
+                            onSelect = { index ->
+                                if (index != selectedTabState.intValue) {
+                                    val current = binding.viewpager.currentItem
+                                    hideViewpager(abs(index - current))
+                                    selectedTabState.intValue = index
+                                    binding.viewpager.setCurrentItem(index, false)
+                                    libraryViewModel.switchPage(index)
+                                }
+                            },
+                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                        )
+                    }
+                }
+            }
+
+            viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+                PosterCardStyleRepository.state.collect {
+                    (binding.viewpager.adapter as? ViewpagerAdapter)?.notifyDataSetChanged()
+                }
+            }
+
+            binding.viewpager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    selectedTabState.intValue = position
+                    libraryViewModel.switchPage(position)
+                }
+            })
+        }
 
         libraryViewModel.reloadPages(false)
 
         binding.listSelector.setOnClickListener {
-            val items = libraryViewModel.availableApiNames
-            val currentItem = libraryViewModel.currentApiName.value
-
-            activity?.showBottomDialog(
-                items,
-                items.indexOf(currentItem),
-                txt(R.string.select_library).asString(it.context),
-                false,
-                {}) { index ->
-                val selectedItem = items.getOrNull(index) ?: return@showBottomDialog
-                libraryViewModel.switchList(selectedItem)
-            }
+            showSourceSelectionDialog(it.context)
         }
 
         //Load value for toggling Random button. Hide at startup
@@ -206,75 +373,10 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
             binding.libraryRandomButtonTv.visibility = View.GONE
         }
 
-        /**
-         * Shows a plugin selection dialogue and saves the response
-         **/
-        fun Activity.showPluginSelectionDialog(
-            key: String,
-            syncId: SyncIdName,
-            apiName: String? = null,
-        ) {
-            val availableProviders = allProviders.filter {
-                it.supportedSyncNames.contains(syncId)
-            }.map { it.name } +
-                // Add the api if it exists
-                (APIHolder.getApiFromNameNull(apiName)?.let { listOf(it.name) }
-                    ?: emptyList())
-
-            val baseOptions = listOf(
-                LibraryOpenerType.Default,
-                LibraryOpenerType.None,
-                LibraryOpenerType.Browser,
-                LibraryOpenerType.Search
-            )
-
-            val items = baseOptions.map { txt(it.stringRes).asString(this) } + availableProviders
-
-            val savedSelection = getKey<LibraryOpener>("$currentAccount/$LIBRARY_FOLDER", key)
-            val selectedIndex =
-                when {
-                    savedSelection == null -> 0
-                    // If provider
-                    savedSelection.openType == LibraryOpenerType.Provider
-                            && savedSelection.providerData?.apiName != null -> {
-                        availableProviders.indexOf(savedSelection.providerData.apiName)
-                            .takeIf { it != -1 }
-                            ?.plus(baseOptions.size) ?: 0
-                    }
-                    // Else base option
-                    else -> baseOptions.indexOf(savedSelection.openType)
-                }
-
-            this.showBottomDialog(
-                items,
-                selectedIndex,
-                txt(R.string.open_with).asString(this),
-                false,
-                {},
-            ) {
-                val savedData = if (it < baseOptions.size) {
-                    LibraryOpener(
-                        baseOptions[it],
-                        null
-                    )
-                } else {
-                    LibraryOpener(
-                        LibraryOpenerType.Provider,
-                        ProviderLibraryData(items[it])
-                    )
-                }
-
-                setKey(
-                    "$currentAccount/$LIBRARY_FOLDER",
-                    key,
-                    savedData,
-                )
-            }
-        }
-
         binding.providerSelector.setOnClickListener {
             val syncName = libraryViewModel.currentSyncApi?.syncIdName ?: return@setOnClickListener
-            activity?.showPluginSelectionDialog(syncName.name, syncName)
+            val act = activity ?: return@setOnClickListener
+            showPluginSelectionDialog(act, syncName.name, syncName)
         }
 
         binding.viewpager.setPageTransformer(LibraryScrollTransformer())
@@ -411,54 +513,43 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
                             savedInstanceState.putInt(VIEWPAGER_ITEM_KEY, -1)
                         }
 
-                        // Since the animation to scroll multiple items is so much its better to just hide
-                        // the viewpager a bit while the fastest animation is running
-                        fun hideViewpager(distance: Int) {
-                            if (distance < 3) return
+                        tabTitlesState.value = pages.mapNotNull { it.title.asStringNull(context) }
+                        val sortingMethods = libraryViewModel.sortingMethods
+                        sortOptionsState.value = sortingMethods.map { txt(it.stringRes).asString(context ?: return@map "") }
+                        selectedSortState.intValue = sortingMethods.indexOf(libraryViewModel.currentSortingMethod)
 
-                            val hideAnimation = AlphaAnimation(1f, 0f).apply {
-                                duration = distance * 50L
-                                fillAfter = true
-                            }
-                            val showAnimation = AlphaAnimation(0f, 1f).apply {
-                                duration = distance * 50L
-                                startOffset = distance * 100L
-                                fillAfter = true
-                            }
-                            viewpager.startAnimation(hideAnimation)
-                            viewpager.startAnimation(showAnimation)
-                        }
+                        if (!isLayout(PHONE)) {
+                            TabLayoutMediator(
+                                libraryTabLayout,
+                                viewpager,
+                            ) { tab, position ->
+                                tab.text = pages.getOrNull(position)?.title?.asStringNull(context)
+                                tab.view.tag = "tv_no_focus_tag"
+                                tab.view.nextFocusDownId = R.id.search_result_root
 
-                        TabLayoutMediator(
-                            libraryTabLayout,
-                            viewpager,
-                        ) { tab, position ->
-                            tab.text = pages.getOrNull(position)?.title?.asStringNull(context)
-                            tab.view.tag = "tv_no_focus_tag"
-                            tab.view.nextFocusDownId = R.id.search_result_root
-
-                            tab.view.setOnClickListener {
-                                val currentItem = binding.viewpager.currentItem
-                                val distance = abs(position - currentItem)
-                                hideViewpager(distance)
-                            }
-                            //Expand the appBar on tab focus
-                            tab.view.setOnFocusChangeListener { _, _ ->
-                                binding.searchBar.setExpanded(true)
-                            }
-                        }.attach()
-
-                        binding.libraryTabLayout.addOnTabSelectedListener(object :
-                            TabLayout.OnTabSelectedListener {
-                            override fun onTabSelected(tab: TabLayout.Tab?) {
-                                binding.libraryTabLayout.selectedTabPosition.let { page ->
-                                    libraryViewModel.switchPage(page)
+                                tab.view.setOnClickListener {
+                                    val currentItem = binding.viewpager.currentItem
+                                    val distance = abs(position - currentItem)
+                                    hideViewpager(distance)
                                 }
-                            }
+                                //Expand the appBar on tab focus
+                                tab.view.setOnFocusChangeListener { _, _ ->
+                                    binding.searchBar.setExpanded(true)
+                                }
+                            }.attach()
 
-                            override fun onTabUnselected(tab: TabLayout.Tab?) = Unit
-                            override fun onTabReselected(tab: TabLayout.Tab?) = Unit
-                        })
+                            binding.libraryTabLayout.addOnTabSelectedListener(object :
+                                TabLayout.OnTabSelectedListener {
+                                override fun onTabSelected(tab: TabLayout.Tab?) {
+                                    binding.libraryTabLayout.selectedTabPosition.let { page ->
+                                        libraryViewModel.switchPage(page)
+                                    }
+                                }
+
+                                override fun onTabUnselected(tab: TabLayout.Tab?) = Unit
+                                override fun onTabReselected(tab: TabLayout.Tab?) = Unit
+                            })
+                        }
                     }
                 }
 
@@ -476,6 +567,7 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
         }
 
         observe(libraryViewModel.currentPage) { position ->
+            selectedTabState.intValue = position
             updateRandomVisibility(binding)
             val all = binding.viewpager.allViews.toList()
                 .filterIsInstance<AutofitRecyclerView>()
@@ -489,6 +581,10 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
                 else
                     view.descendantFocusability = FOCUS_BLOCK_DESCENDANTS
             }
+        }
+
+        observe(libraryViewModel.currentApiName) { name ->
+            sourceNameState.value = name
         }
     }
 
@@ -566,6 +662,7 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
             false,
             {},
             {
+                selectedSortState.intValue = it
                 val method = libraryViewModel.sortingMethods[it]
                 libraryViewModel.sort(method)
             })

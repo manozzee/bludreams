@@ -58,6 +58,9 @@ zipline = "1.27.0"
 composeMaterial3 = "1.12.0-alpha03"
 composeMultiplatform = "1.12.0"
 lifecycleViewmodelCompose = "2.11.0"
+haze = "1.7.3"
+kyantBackdrop = "2.0.1"
+kyantShapes = "1.2.1"
 
 # jvmTarget = "11" is needed for compose, otherwise you will get
 # "Cannot inline bytecode built with JVM target 11 into bytecode" or
@@ -82,6 +85,9 @@ coil = { module = "io.coil-kt.coil3:coil", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 colorpicker = { module = "com.github.recloudstream:color-picker-android", version.ref = "colorpicker" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+kyant-backdrop = { module = "io.github.kyant0:backdrop", version.ref = "kyantBackdrop" }
+kyant-shapes = { module = "io.github.kyant0:shapes", version.ref = "kyantShapes" }
 conscrypt-android = { module = "org.conscrypt:conscrypt-android", version.ref = "conscryptAndroid" }
 constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 core = { module = "androidx.test:core" }

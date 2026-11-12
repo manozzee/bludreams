@@ -11,7 +11,7 @@
     android:foreground="@drawable/outline_drawable"
     android:orientation="vertical">
 
-    <androidx.cardview.widget.CardView
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/background_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,7 +19,9 @@
         android:layout_marginBottom="2dp"
         android:elevation="10dp"
         app:cardBackgroundColor="?attr/primaryGrayBackground"
-        app:cardCornerRadius="@dimen/rounded_image_radius">
+        app:cardCornerRadius="@dimen/rounded_image_radius"
+        app:strokeWidth="1dp"
+        app:strokeColor="#14FFFFFF">
 
         <ImageView
             android:id="@+id/imageView"
@@ -28,7 +30,7 @@
             android:layout_height="match_parent"
             android:contentDescription="@string/search_poster_img_des"
             android:duplicateParentState="true"
-            android:foreground="?android:attr/selectableItemBackgroundBorderless"
+            android:foreground="?android:attr/selectableItemBackground"
             android:scaleType="centerCrop" />
 
         <ImageView
@@ -112,6 +114,6 @@
                 android:textStyle="bold"
                 tools:text="The Perfect Run" />
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
+    </com.google.android.material.card.MaterialCardView>
 
 </LinearLayout>

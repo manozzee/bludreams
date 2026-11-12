@@ -13,6 +13,7 @@
         android:layout_gravity="center_vertical"
         android:layout_margin="20dp"
         android:gravity="center_horizontal"
+        android:textAppearance="@style/TextAppearance.CloudStream.Player.Timer"
         android:text="1.00x"
         android:textSize="20sp"
         tools:ignore="HardcodedText" />

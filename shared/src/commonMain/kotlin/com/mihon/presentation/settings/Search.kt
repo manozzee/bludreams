@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -149,14 +150,18 @@ fun <T> SettingSearchResults(
                     modifier = Modifier
                         .nestedScroll(nestedScrollConnection)
                 ) {
-                    it.forEach { item ->
-                        TextPreferenceWidget(
-                            title = item.title,
-                            subtitle = item.breadcrumbs,
-                            onPreferenceClick = {
-                                onItemClick(item)
-                            }
-                        )
+                    val total = it.size
+                    for ((index, item) in it.withIndex()) {
+                        val position = com.mihon.presentation.settings.widget.getGroupPosition(index, total)
+                        CompositionLocalProvider(com.mihon.presentation.settings.widget.LocalGroupPosition provides position) {
+                            TextPreferenceWidget(
+                                title = item.title,
+                                subtitle = item.breadcrumbs,
+                                onPreferenceClick = {
+                                    onItemClick(item)
+                                }
+                            )
+                        }
                     }
                 }
             }

@@ -4,16 +4,23 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.core.content.edit
+import androidx.preference.Preference
 import androidx.preference.PreferenceManager
 import androidx.preference.SeekBarPreference
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.getActivity
+import com.lagradost.cloudstream3.CommonActivity
 import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.R
-import com.lagradost.cloudstream3.SearchQuality
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.ui.BasePreferenceFragmentCompat
 import com.lagradost.cloudstream3.ui.clear
 import com.lagradost.cloudstream3.ui.home.HomeChildItemAdapter
+import com.lagradost.cloudstream3.ui.home.HomeFragment.Companion.getDisplayName
+import com.lagradost.cloudstream3.ui.home.HomeFragment.Companion.selectHomepage
+import com.lagradost.cloudstream3.utils.DataStoreHelper
+import com.lagradost.cloudstream3.APIHolder
+import com.lagradost.cloudstream3.ui.APIRepository.Companion.noneApi
+import com.lagradost.cloudstream3.ui.APIRepository.Companion.randomApi
 import com.lagradost.cloudstream3.ui.home.ParentItemAdapter
 import com.lagradost.cloudstream3.ui.search.SearchAdapter
 import com.lagradost.cloudstream3.ui.search.SearchResultBuilder
@@ -30,6 +37,7 @@ import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showMultiDialog
 import com.lagradost.cloudstream3.utils.UIHelper.hideKeyboard
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
+import com.lagradost.cloudstream3.ui.home.HomeFragment
 
 class SettingsUI : BasePreferenceFragmentCompat() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -44,54 +52,19 @@ class SettingsUI : BasePreferenceFragmentCompat() {
         setPreferencesFromResource(R.xml.settings_ui, rootKey)
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(requireContext())
 
+
+        findPreference<Preference>("poster_card_style_key")?.setOnPreferenceClickListener {
+            PosterCustomizationSettingsDialogFragment.show(parentFragmentManager)
+            true
+        }
+
         (getPref(R.string.overscan_key)?.hideOn(PHONE or EMULATOR) as? SeekBarPreference)?.setOnPreferenceChangeListener { pref, newValue ->
             val padding = (newValue as? Int)?.toPx ?: return@setOnPreferenceChangeListener true
             (pref.context.getActivity() as? MainActivity)?.binding?.homeRoot?.setPadding(padding, padding, padding, padding)
             return@setOnPreferenceChangeListener true
         }
 
-        getPref(R.string.bottom_title_key)?.setOnPreferenceChangeListener { _, _ ->
-            HomeChildItemAdapter.sharedPool.clear()
-            ParentItemAdapter.sharedPool.clear()
-            SearchAdapter.sharedPool.clear()
-            true
-        }
 
-        getPref(R.string.poster_size_key)?.setOnPreferenceChangeListener { _, newValue ->
-            HomeChildItemAdapter.sharedPool.clear()
-            ParentItemAdapter.sharedPool.clear()
-            SearchAdapter.sharedPool.clear()
-            context?.let { HomeChildItemAdapter.updatePosterSize(it, newValue as? Int) }
-            true
-        }
-
-        getPref(R.string.poster_ui_key)?.setOnPreferenceClickListener {
-            val prefNames = resources.getStringArray(R.array.poster_ui_options)
-            val keys = resources.getStringArray(R.array.poster_ui_options_values)
-            val prefValues = keys.map {
-                settingsManager.getBoolean(it, true)
-            }.mapIndexedNotNull { index, b ->
-                if (b) {
-                    index
-                } else null
-            }
-
-            activity?.showMultiDialog(
-                prefNames.toList(),
-                prefValues,
-                getString(R.string.poster_ui_settings),
-                {}
-            ) { list ->
-                settingsManager.edit {
-                    for ((i, key) in keys.withIndex()) {
-                        putBoolean(key, list.contains(i))
-                    }
-                }
-                SearchResultBuilder.updateCache(it.context)
-            }
-
-            return@setOnPreferenceClickListener true
-        }
 
         getPref(R.string.app_layout_key)?.setOnPreferenceClickListener {
             val prefNames = resources.getStringArray(R.array.app_layout)
@@ -121,47 +94,15 @@ class SettingsUI : BasePreferenceFragmentCompat() {
             return@setOnPreferenceClickListener true
         }
 
-        getPref(R.string.app_theme_key)?.setOnPreferenceClickListener {
-            val prefNames = resources.getStringArray(R.array.themes_names).toMutableList()
-            val prefValues = resources.getStringArray(R.array.themes_names_values).toMutableList()
-            val removeIncompatible = { text: String ->
-                val toRemove = prefValues
-                    .mapIndexed { idx, s -> if (s.startsWith(text)) idx else null }
-                    .filterNotNull()
-                var offset = 0
-                toRemove.forEach { idx ->
-                    prefNames.removeAt(idx - offset)
-                    prefValues.removeAt(idx - offset)
-                    offset += 1
-                }
+        getPref(R.string.pure_black_key)?.setOnPreferenceChangeListener { _, newValue ->
+            settingsManager.edit {
+                putBoolean(getString(R.string.pure_black_key), newValue as Boolean)
             }
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) { // remove monet on android 11 and less
-                removeIncompatible("Monet")
+            activity?.let { act ->
+                CommonActivity.loadThemes(act)
+                act.recreate()
             }
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) { // Remove system on android 9 and less
-                removeIncompatible("System")
-            }
-
-            val currentLayout =
-                settingsManager.getString(getString(R.string.app_theme_key), prefValues.first())
-
-            activity?.showBottomDialog(
-                prefNames.toList(),
-                prefValues.indexOf(currentLayout),
-                getString(R.string.app_theme_settings),
-                true,
-                {}
-            ) {
-                try {
-                    settingsManager.edit {
-                        putString(getString(R.string.app_theme_key), prefValues[it])
-                    }
-                    activity?.recreate()
-                } catch (e: Exception) {
-                    logError(e)
-                }
-            }
-            return@setOnPreferenceClickListener true
+            false
         }
         getPref(R.string.primary_color_key)?.setOnPreferenceClickListener {
             val prefNames = resources.getStringArray(R.array.themes_overlay_names).toMutableList()
@@ -202,31 +143,7 @@ class SettingsUI : BasePreferenceFragmentCompat() {
             return@setOnPreferenceClickListener true
         }
 
-        getPref(R.string.pref_filter_search_quality_key)?.setOnPreferenceClickListener {
-            val names = enumValues<SearchQuality>().sorted().map { it.name }
-            val currentList = settingsManager.getStringSet(
-                getString(R.string.pref_filter_search_quality_key),
-                setOf()
-            )?.map {
-                it.toInt()
-            } ?: listOf()
 
-            activity?.showMultiDialog(
-                names,
-                currentList,
-                getString(R.string.pref_filter_search_quality),
-                {}
-            ) { selectedList ->
-                settingsManager.edit {
-                    putStringSet(
-                        getString(R.string.pref_filter_search_quality_key),
-                        selectedList.map { it.toString() }.toMutableSet()
-                    )
-                }
-            }
-
-            return@setOnPreferenceClickListener true
-        }
 
         getPref(R.string.tv_layout_clock_key)?.hideOn(PHONE or EMULATOR)
 
@@ -248,6 +165,26 @@ class SettingsUI : BasePreferenceFragmentCompat() {
                 }
             )
             return@setOnPreferenceClickListener true
+        }
+
+        val homeSourcePref = findPreference<Preference>("home_page_source_key")
+        fun updateHomeSourceSummary() {
+            val currentApiName = DataStoreHelper.currentHomePage
+            val displayName = context?.getDisplayName(currentApiName) ?: (currentApiName ?: getString(R.string.none))
+            homeSourcePref?.summary = getString(R.string.home_page_source_summary_format, displayName)
+        }
+        updateHomeSourceSummary()
+
+        homeSourcePref?.setOnPreferenceClickListener {
+            val context = requireContext()
+            val currentHome = DataStoreHelper.currentHomePage
+            with(context) {
+                selectHomepage(currentHome) { selectedApi ->
+                    DataStoreHelper.currentHomePage = selectedApi
+                    updateHomeSourceSummary()
+                }
+            }
+            true
         }
     }
 }

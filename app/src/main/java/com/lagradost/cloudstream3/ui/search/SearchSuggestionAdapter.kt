@@ -48,6 +48,8 @@ class SearchSuggestionAdapter(
         position: Int
     ) {
         val binding = holder.view as? SearchSuggestionItemBinding ?: return
+        val bg = com.lagradost.cloudstream3.utils.GroupCardHelper.getAccentContainerColor(binding.root.context)
+        binding.suggestionItem.setCardBackgroundColor(android.content.res.ColorStateList.valueOf(bg))
         binding.apply {
             suggestionText.text = item
             

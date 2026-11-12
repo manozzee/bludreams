@@ -12,6 +12,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 
 enum class CloudStreamThemeMode {
     /** "Black" standard dark, #111111 backgrounds */
@@ -46,29 +47,30 @@ enum class CloudStreamThemeMode {
 }
 
 @Composable
-fun modeToTheme(mode : CloudStreamThemeMode, primaryColor: CloudStreamPrimaryColor) : CloudStreamColorScheme {
-    val dynamicTheme = DeviceTheme.resolveDynamicTheme()
+fun modeToTheme(mode: CloudStreamThemeMode, primaryColor: CloudStreamPrimaryColor): CloudStreamColorScheme {
     val dynamicPrimary = DeviceTheme.resolveDynamicPrimaryColor()
     val dynamicSecondary = DeviceTheme.resolveDynamicSecondaryColor()
-    val systemDark = isSystemInDarkTheme()
-    val color = remember(mode, primaryColor, systemDark, dynamicTheme, dynamicPrimary, dynamicSecondary) {
+    val color = remember(mode, primaryColor, dynamicPrimary, dynamicSecondary) {
         val base = when (mode) {
-            CloudStreamThemeMode.Dark -> darkScheme()
             CloudStreamThemeMode.Amoled -> amoledScheme()
-            CloudStreamThemeMode.AmoledLight -> amoledLightScheme()
-            CloudStreamThemeMode.Light -> lightScheme()
-            CloudStreamThemeMode.Dracula -> draculaScheme()
-            CloudStreamThemeMode.Lavender -> lavenderScheme()
-            CloudStreamThemeMode.SilentBlue -> silentBlueScheme()
-            CloudStreamThemeMode.FollowSystem -> if (systemDark) darkScheme() else lightScheme()
-            CloudStreamThemeMode.Dynamic -> dynamicTheme
+            else -> darkScheme()
         }
-        when {
-            mode == CloudStreamThemeMode.Dynamic -> base
-            primaryColor == CloudStreamPrimaryColor.DYNAMIC -> base.copy(primary = dynamicPrimary)
-            primaryColor == CloudStreamPrimaryColor.DYNAMIC_TWO -> base.copy(primary = dynamicSecondary)
-            else -> base.copy(primary = primaryColor.color)
+        val accent = when {
+            primaryColor == CloudStreamPrimaryColor.DYNAMIC -> dynamicPrimary
+            primaryColor == CloudStreamPrimaryColor.DYNAMIC_TWO -> dynamicSecondary
+            else -> primaryColor.color
         }
+        val isAmoled = mode == CloudStreamThemeMode.Amoled
+        val containerBase = if (isAmoled) Color(0xFF0C0C0E) else Color(0xFF161619)
+        val elevatedBase = if (isAmoled) Color(0xFF111113) else Color(0xFF1C1C20)
+        val accentContainer = accent.copy(alpha = 0.03f).compositeOver(containerBase)
+        val accentElevated = accent.copy(alpha = 0.05f).compositeOver(elevatedBase)
+        base.copy(
+            primary = accent,
+            surfaceVariant = accentContainer,
+            surfaceContainer = accentContainer,
+            surface = accentElevated,
+        )
     }
     return color
 }
@@ -76,6 +78,7 @@ fun modeToTheme(mode : CloudStreamThemeMode, primaryColor: CloudStreamPrimaryCol
 private fun CloudStreamColorScheme.toMaterial3ColorScheme() = if (isLight) {
     lightColorScheme(
         primary = primary,
+        primaryContainer = surfaceVariant,
         background = background,
         surface = surface,
         surfaceVariant = surfaceVariant,
@@ -88,6 +91,7 @@ private fun CloudStreamColorScheme.toMaterial3ColorScheme() = if (isLight) {
 } else {
     darkColorScheme(
         primary = primary,
+        primaryContainer = surfaceVariant,
         background = background,
         surface = surface,
         surfaceVariant = surfaceVariant,
@@ -117,7 +121,7 @@ fun CloudStreamPreviewTheme(content: @Composable () -> Unit) {
 @Composable
 fun CloudStreamTheme(
     mode: CloudStreamThemeMode = CloudStreamThemeMode.FollowSystem,
-    primaryColor: CloudStreamPrimaryColor = CloudStreamPrimaryColor.NORMAL,
+    primaryColor: CloudStreamPrimaryColor = CloudStreamPrimaryColor.VELVET_NOIR,
     content: @Composable () -> Unit,
 ) {
     val csColors = modeToTheme(mode, primaryColor)

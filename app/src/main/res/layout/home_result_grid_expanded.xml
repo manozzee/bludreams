@@ -43,7 +43,7 @@
                 android:layout_height="match_parent"
                 android:contentDescription="@string/search_poster_img_des"
                 android:duplicateParentState="true"
-                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:scaleType="centerCrop"
                 tools:src="@drawable/example_poster" />
 
@@ -196,6 +196,7 @@
             android:paddingBottom="5dp"
             android:textColor="?attr/textColor"
             android:textSize="13sp"
+            android:fontFamily="@font/outfit_semibold"
             tools:text="The Perfect Run\nThe Perfect Run\nhello" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

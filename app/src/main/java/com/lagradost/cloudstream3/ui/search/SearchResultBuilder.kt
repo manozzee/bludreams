@@ -19,6 +19,8 @@ import com.lagradost.cloudstream3.SearchQuality
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.isMovieType
 import com.lagradost.cloudstream3.syncproviders.SyncAPI
+import com.lagradost.cloudstream3.ui.poster.CardDepthRepository
+import com.lagradost.cloudstream3.ui.poster.PosterCardStyleRepository
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
@@ -28,6 +30,7 @@ import com.lagradost.cloudstream3.utils.DataStoreHelper.fixVisual
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.SubtitleHelper
 import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
+import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 object SearchResultBuilder {
@@ -69,6 +72,26 @@ object SearchResultBuilder {
         val playImg: ImageView? = itemView.findViewById(R.id.search_item_download_play)
         val episodeText: TextView? = itemView.findViewById(R.id.episode_text)
 
+        val style = PosterCardStyleRepository.state.value
+        val depthState = CardDepthRepository.state.value
+
+        bg.radius = style.cornerRadiusDp.toPx.toFloat()
+        val depthElevation = if (depthState.enabled && depthState.posterCardsEnabled) {
+            depthState.preset.elevation.value.toPx
+        } else {
+            0f
+        }
+        bg.cardElevation = depthElevation
+        bg.setCardBackgroundColor(com.lagradost.cloudstream3.utils.GroupCardHelper.getAccentContainerColor(itemView.context))
+
+        (bg.layoutParams as? androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)?.let { lp ->
+            val targetRatio = if (style.catalogLandscapeModeEnabled) "16:9" else "1:1.5"
+            if (lp.dimensionRatio != targetRatio) {
+                lp.dimensionRatio = targetRatio
+                bg.layoutParams = lp
+            }
+        }
+
         // Do logic
 
         bar?.isVisible = false
@@ -79,13 +102,12 @@ object SearchResultBuilder {
         rating?.isVisible = false
         episodeText?.isVisible = false
 
-        val showSub = showCache[textIsDub?.context?.getString(R.string.show_sub_key)] ?: false
-        val showDub = showCache[textIsDub?.context?.getString(R.string.show_dub_key)] ?: false
-        val showTitle = showCache[cardText?.context?.getString(R.string.show_title_key)] ?: false
-        val showEpisodeText = showCache[cardText?.context?.getString(R.string.show_episode_text_key)] ?: false
-        val showHd = showCache[textQuality?.context?.getString(R.string.show_hd_key)] ?: false
-        val showRatingView =
-            showCache[textQuality?.context?.getString(R.string.show_rating_key)] ?: false
+        val showSub = style.showSub
+        val showDub = style.showDub
+        val showTitle = !style.hideLabelsEnabled && (showCache[cardText?.context?.getString(R.string.show_title_key)] ?: true)
+        val showEpisodeText = style.showEpisode
+        val showHd = style.showQuality
+        val showRatingView = style.showRating
         if (card is SyncAPI.LibraryItem) {
             val ratingText = card.personalRating?.toStringNull(0.1, 10, 1)
             val showRating = !ratingText.isNullOrBlank()

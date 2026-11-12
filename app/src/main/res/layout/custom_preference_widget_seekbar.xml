@@ -52,7 +52,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
-                android:textAppearance="?android:attr/textAppearanceListItem"
+                android:textAppearance="@style/TextAppearance.CloudStream.Title"
                 android:ellipsize="marquee"
                 tools:ignore="LabelFor" />
 
@@ -66,7 +66,7 @@
                 android:textAlignment="viewStart"
                 android:textColor="?android:attr/textColorSecondary"
                 android:maxLines="4"
-                style="@style/PreferenceSummaryTextStyle"/>
+                style="@style/AppPreferenceSummaryTextStyle"/>
 
         </RelativeLayout>
 
@@ -115,6 +115,8 @@
                 android:gravity="end"
                 android:singleLine="true"
                 android:textAppearance="?android:attr/textAppearanceListItem"
+                android:fontFamily="@font/figtree_medium"
+                android:fontFeatureSettings="tnum"
                 android:ellipsize="marquee"
                 android:fadingEdge="horizontal"
                 android:scrollbars="none"/>

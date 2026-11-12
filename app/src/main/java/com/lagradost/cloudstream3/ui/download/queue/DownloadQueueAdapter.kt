@@ -24,6 +24,8 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
 import com.lagradost.cloudstream3.utils.DOWNLOAD_EPISODE_CACHE
 import com.lagradost.cloudstream3.utils.DataStore.getFolderName
 import com.lagradost.cloudstream3.utils.DataStore.getKey
+import com.lagradost.cloudstream3.utils.GroupCardHelper
+import com.lagradost.cloudstream3.utils.GroupPosition
 import com.lagradost.cloudstream3.utils.UIHelper.popupMenuNoIcons
 import com.lagradost.cloudstream3.utils.downloader.DownloadObjects
 import com.lagradost.cloudstream3.utils.downloader.DownloadObjects.DownloadQueueWrapper
@@ -69,6 +71,15 @@ class DownloadQueueAdapter(val fragment: Fragment) : BaseAdapter<DownloadAdapter
                     bindSeparator(binding)
                 } else {
                     holder.itemView.tag = null
+                    val prevIsItem = position > 0 && getItem(position - 1).item != null
+                    val nextIsItem = position < itemCount - 1 && getItem(position + 1).item != null
+                    val groupPos = when {
+                        !prevIsItem && !nextIsItem -> GroupPosition.Single
+                        !prevIsItem && nextIsItem -> GroupPosition.First
+                        prevIsItem && nextIsItem -> GroupPosition.Middle
+                        else -> GroupPosition.Last
+                    }
+                    GroupCardHelper.applyGroupCardStyle(binding.downloadChildEpisodeHolder, groupPos)
                     bind(binding, item.item)
                 }
             }
@@ -123,10 +134,14 @@ class DownloadQueueAdapter(val fragment: Fragment) : BaseAdapter<DownloadAdapter
             val status = VideoDownloadManager.downloadStatus[queueWrapper.id]
 
             downloadButton.setOnClickListener { view ->
+                val parentId = queueWrapper.parentId
                 val episodeCached =
                     getKey<DownloadObjects.DownloadEpisodeCached>(
+                        getFolderName(DOWNLOAD_EPISODE_CACHE, parentId.toString()),
+                        queueWrapper.id.toString()
+                    ) ?: getKey<DownloadObjects.DownloadEpisodeCached>(
                         DOWNLOAD_EPISODE_CACHE,
-                        getFolderName(queueWrapper.parentId.toString(), queueWrapper.id.toString())
+                        queueWrapper.id.toString()
                     )
 
                 val downloadInfo = context.getKey<DownloadObjects.DownloadedFileInfo>(
@@ -222,7 +237,9 @@ private class DragAndDropTouchHelperCallback(private val adapter: DownloadQueueA
         recyclerView: RecyclerView,
         viewHolder: RecyclerView.ViewHolder
     ): Int {
-        val item = adapter.getItem(viewHolder.absoluteAdapterPosition)
+        val pos = viewHolder.absoluteAdapterPosition
+        if (pos == RecyclerView.NO_POSITION || pos !in 0 until adapter.itemCount) return 0
+        val item = adapter.getItem(pos)
         val isDownloading = item.item?.isCurrentlyDownloading() == true
         val dragFlags = if (item.isSeparator || isDownloading) {
             0
@@ -241,6 +258,8 @@ private class DragAndDropTouchHelperCallback(private val adapter: DownloadQueueA
     ): Boolean {
         val fromPosition = source.absoluteAdapterPosition
         val toPosition = target.absoluteAdapterPosition
+        if (fromPosition == RecyclerView.NO_POSITION || toPosition == RecyclerView.NO_POSITION) return false
+        if (fromPosition !in 0 until adapter.itemCount || toPosition !in 0 until adapter.itemCount) return false
         val separatorPosition = adapter.currentDownloads
 
         val toPositionNoSeparator =

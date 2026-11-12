@@ -171,50 +171,24 @@
     </array>
 
     <string-array name="themes_overlay_names">
-        <item>Mặc định</item>
-        <item>bồ công anh màu vàng</item>
-        <item>Hồng nhạt</item>
-        <item>Quả cam</item>
-        <item>Xanh lam đậm</item>
-        <item>Nâu sẫm</item>
-        <item>Xanh lục</item>
-        <item>Xám</item>
-        <item>Trắng</item>
-        <item>Màu xanh mát</item>
-        <item>Nâu</item>
-        <item>Xanh lục nhạt</item>
-        <item>Đỏ</item>
-        <item>Tím</item>
-        <item>Xanh lam</item>
-        <item>Xanh lam nhạt</item>
-        <item>Vàng</item>
-        <item>Hồng</item>
-        <item>Hồng đậm</item>
-        <item>Hoa oải hương</item>
+        <item>Velvet Noir</item>
+        <item>Aura Brass</item>
+        <item>Smoked Cognac</item>
+        <item>Obsidian Pine</item>
+        <item>Fincher Teal</item>
+        <item>Midnight Lapis</item>
+        <item>Nocturne Violet</item>
         <item>Material You</item>
         <item>Material You (Secondary)</item>
     </string-array>
     <string-array name="themes_overlay_names_values">
-        <item>Normal</item>
-        <item>DandelionYellow</item>
-        <item>CarnationPink</item>
-        <item>Orange</item>
-        <item>DarkGreen</item>
-        <item>Maroon</item>
-        <item>NavyBlue</item>
-        <item>Grey</item>
-        <item>White</item>
-        <item>CoolBlue</item>
-        <item>Brown</item>
-        <item>Blue</item>
-        <item>Red</item>
-        <item>Purple</item>
-        <item>Green</item>
-        <item>GreenApple</item>
-        <item>Banana</item>
-        <item>Party</item>
-        <item>Pink</item>
-        <item>Lavender</item>
+        <item>VelvetNoir</item>
+        <item>AuraBrass</item>
+        <item>SmokedCognac</item>
+        <item>ObsidianPine</item>
+        <item>FincherTeal</item>
+        <item>MidnightLapis</item>
+        <item>NocturneViolet</item>
         <item>Monet</item>
         <item>Monet2</item>
     </string-array>

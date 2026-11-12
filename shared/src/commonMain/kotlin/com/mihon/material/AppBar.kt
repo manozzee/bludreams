@@ -1,25 +1,31 @@
 package com.mihon.material
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream4.compose.WhiteIconButton
 import com.lagradost.cloudstream4.generated.resources.Res
 import com.lagradost.cloudstream4.generated.resources.action_bar_up_description
@@ -104,7 +110,14 @@ fun AppBar(
             windowInsets = WindowInsets(0, 0, 0, 0),
             navigationIcon = {
                 if (isActionMode) {
-                    WhiteIconButton(onClick = onCancelActionMode) {
+                    WhiteIconButton(
+                        onClick = onCancelActionMode,
+                        modifier = Modifier
+                            .padding(start = 12.dp)
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.10f)),
+                    ) {
                         Icon(
                             painter = painterResource(Res.drawable.close),
                             contentDescription = stringResource(Res.string.cancel),
@@ -112,7 +125,14 @@ fun AppBar(
                     }
                 } else {
                     navigateUp?.let {
-                        WhiteIconButton(onClick = it) {
+                        WhiteIconButton(
+                            onClick = it,
+                            modifier = Modifier
+                                .padding(start = 12.dp)
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.10f)),
+                        ) {
                             UpIcon(navigationIcon = navigationIcon)
                         }
                     }
@@ -121,9 +141,7 @@ fun AppBar(
             title = titleContent,
             actions = actions,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = backgroundColor ?: MaterialTheme.colorScheme.surfaceColorAtElevation(
-                    elevation = if (isActionMode) 3.dp else 0.dp,
-                ),
+                containerColor = backgroundColor ?: Color(0xFF0F0F0F),
             ),
             scrollBehavior = scrollBehavior,
         )
@@ -136,18 +154,27 @@ fun AppBarTitle(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
 ) {
-    Column(modifier = modifier) {
+    Column(modifier = modifier.padding(start = 6.dp)) {
         title?.let {
             Text(
                 text = it,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    fontSize = 20.sp,
+                    color = Color.White,
+                ),
             )
         }
         subtitle?.let {
             Text(
                 text = it,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                ),
+                color = Color.White.copy(alpha = 0.65f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.basicMarquee(

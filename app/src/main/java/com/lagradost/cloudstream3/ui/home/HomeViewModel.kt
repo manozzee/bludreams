@@ -317,102 +317,117 @@ class HomeViewModel : ViewModel() {
     }
 
     private fun load(api: MainAPI): Job = ioSafe {
-        repo = //if (api != null) {
-            APIRepository(api)
-        //} else {
-        //    autoloadRepo()
-        //}
+        try {
+            repo = //if (api != null) {
+                APIRepository(api)
+            //} else {
+            //    autoloadRepo()
+            //}
 
-        _apiName.postValue(repo?.name)
-        _randomItems.postValue(listOf())
+            _apiName.postValue(repo?.name)
+            _randomItems.postValue(listOf())
 
-        if (repo?.hasMainPage != true) {
-            _page.postValue(Resource.Success(emptyMap()))
-            _preview.postValue(Resource.Failure(false, "No homepage"))
-            return@ioSafe
-        }
+            if (repo?.hasMainPage != true) {
+                _page.postValue(Resource.Success(emptyMap()))
+                _preview.postValue(Resource.Failure(false, "No homepage"))
+                return@ioSafe
+            }
 
 
-        _page.postValue(Resource.Loading())
-        _preview.postValue(Resource.Loading())
-        // cancel the current preview expand as that is no longer relevant
-        addJob?.cancel()
+            _page.postValue(Resource.Loading())
+            _preview.postValue(Resource.Loading())
+            // cancel the current preview expand as that is no longer relevant
+            addJob?.cancel()
 
-        when (val data = repo?.getMainPage(1, null)) {
-            is Resource.Success -> {
-                try {
-                    expandable.clear()
-                    data.value.forEach { home ->
-                        home?.items?.forEach { list ->
-                            val filteredList =
-                                context?.filterHomePageListByFilmQuality(list) ?: list
-                            expandable[list.name] =
-                                ExpandableHomepageList(
-                                    filteredList.copy(
-                                        list = CopyOnWriteArrayList(
-                                            filteredList.list
-                                        )
-                                    ), 1, home.hasNext
+            when (val data = repo?.getMainPage(1, null)) {
+                is Resource.Success -> {
+                    try {
+                        expandable.clear()
+                        data.value.forEach { home ->
+                            home?.items?.forEach { list ->
+                                val filteredList =
+                                    context?.filterHomePageListByFilmQuality(list) ?: list
+                                expandable[list.name] =
+                                    ExpandableHomepageList(
+                                        filteredList.copy(
+                                            list = CopyOnWriteArrayList(
+                                                filteredList.list
+                                            )
+                                        ), 1, home.hasNext
+                                    )
+                            }
+                        }
+
+                        // Post the homepage lists immediately so lower feeds render without waiting for preview network calls
+                        _page.postValue(Resource.Success(HashMap(expandable)))
+
+                        val items = data.value.mapNotNull { it?.items }.flatten()
+
+
+                        previewResponses.clear()
+                        previewResponsesAdded.clear()
+
+                        //val home = data.value
+                        if (items.isNotEmpty()) {
+                            val currentList =
+                                items.shuffled().filter { it.list.isNotEmpty() }
+                                    .flatMap { it.list }
+                                    .distinctBy { it.url }.toList()
+
+                            if (currentList.isNotEmpty()) {
+                                val randomItems =
+                                    context?.filterSearchResultByFilmQuality(currentList.shuffled())
+                                        ?: currentList.shuffled()
+
+                                updatePreviewResponses(
+                                    previewResponses,
+                                    previewResponsesAdded,
+                                    randomItems,
+                                    3
                                 )
+
+                                _randomItems.postValue(randomItems)
+                                currentShuffledList = randomItems
+                            }
                         }
-                    }
-
-                    val items = data.value.mapNotNull { it?.items }.flatten()
-
-
-                    previewResponses.clear()
-                    previewResponsesAdded.clear()
-
-                    //val home = data.value
-                    if (items.isNotEmpty()) {
-                        val currentList =
-                            items.shuffled().filter { it.list.isNotEmpty() }
-                                .flatMap { it.list }
-                                .distinctBy { it.url }.toList()
-
-                        if (currentList.isNotEmpty()) {
-                            val randomItems =
-                                context?.filterSearchResultByFilmQuality(currentList.shuffled())
-                                    ?: currentList.shuffled()
-
-                            updatePreviewResponses(
-                                previewResponses,
-                                previewResponsesAdded,
-                                randomItems,
-                                3
+                        if (previewResponses.isEmpty()) {
+                            _preview.postValue(
+                                Resource.Failure(
+                                    false,
+                                    "No homepage responses"
+                                )
                             )
-
-                            _randomItems.postValue(randomItems)
-                            currentShuffledList = randomItems
+                        } else {
+                            _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
                         }
+                        _page.postValue(Resource.Success(HashMap(expandable)))
+                    } catch (e: Exception) {
+                        _randomItems.postValue(emptyList())
+                        logError(e)
+                        if (expandable.isNotEmpty()) {
+                            _page.postValue(Resource.Success(HashMap(expandable)))
+                        } else {
+                            _page.postValue(Resource.Failure(false, e.message ?: "Failed to load homepage"))
+                        }
+                        _preview.postValue(Resource.Failure(false, e.message ?: "Failed to load preview"))
                     }
-                    if (previewResponses.isEmpty()) {
-                        _preview.postValue(
-                            Resource.Failure(
-                                false,
-                                "No homepage responses"
-                            )
-                        )
-                    } else {
-                        _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
-                    }
-                    _page.postValue(Resource.Success(expandable))
-                } catch (e: Exception) {
-                    _randomItems.postValue(emptyList())
-                    logError(e)
+                }
+
+                is Resource.Failure -> {
+                    @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
+                    _page.postValue(data!!)
+                    @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
+                    _preview.postValue(data!!)
+                }
+
+                else -> {
+                    _page.postValue(Resource.Failure(false, "Failed to load homepage"))
+                    _preview.postValue(Resource.Failure(false, "Failed to load preview"))
                 }
             }
-
-            is Resource.Failure -> {
-                @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
-                _page.postValue(data!!)
-                @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
-                _preview.postValue(data!!)
-            }
-
-            else -> Unit
+        } finally {
+            isCurrentlyLoadingName = null
         }
-        isCurrentlyLoadingName = null
     }
 
     fun click(callback: SearchClickCallback) {

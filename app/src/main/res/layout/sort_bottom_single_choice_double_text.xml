@@ -51,7 +51,7 @@
             android:foreground="@null"
             android:minHeight="@null"
             android:padding="0dp"
-            android:textSize="12sp"
+            android:textSize="11sp"
             app:drawableStartCompat="@null"
             tools:text="English · OpenSubtitles" />
     </LinearLayout>

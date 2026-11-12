@@ -19,6 +19,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
+import com.lagradost.cloudstream3.ui.poster.PosterCardStyleRepository
+import com.lagradost.cloudstream3.utils.UIHelper.getPosterSpanCount
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -42,6 +45,10 @@ import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.databinding.FragmentSearchBinding
 import com.lagradost.cloudstream3.databinding.HomeSelectMainpageBinding
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import com.lagradost.cloudstream3.ui.liquidglass.SearchHeaderBar
 import com.lagradost.cloudstream3.mvvm.Resource
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.mvvm.observe
@@ -113,6 +120,62 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
     private val searchViewModel: SearchViewModel by activityViewModels()
     private var bottomSheetDialog: BottomSheetDialog? = null
 
+    private val searchQueryState = mutableStateOf("")
+    private val isSearchLoadingState = mutableStateOf(false)
+
+    private fun onSearchQueryChanged(newText: String) {
+        val currentQuery = searchQueryState.value
+        if (currentQuery == newText && binding?.mainSearch?.query?.toString() == newText) {
+            return
+        }
+        searchQueryState.value = newText
+        if (binding?.mainSearch?.query?.toString() != newText) {
+            binding?.mainSearch?.setQuery(newText, false)
+        }
+
+        val settingsManager = context?.let { PreferenceManager.getDefaultSharedPreferences(it) }
+        val isAdvancedSearch = settingsManager?.getBoolean("advanced_search", true) ?: true
+        val isSearchSuggestionsEnabled = settingsManager?.getBoolean("search_suggestions_enabled", true) ?: true
+
+        val showHistory = newText.isBlank()
+        if (showHistory) {
+            searchViewModel.clearSearch()
+            searchViewModel.updateHistory()
+            searchViewModel.clearSuggestions()
+        } else {
+            if (isSearchSuggestionsEnabled) {
+                searchViewModel.fetchSuggestions(newText)
+            }
+        }
+        val historyList = (binding?.searchHistoryRecycler?.adapter as? SearchHistoryAdaptor)?.immutableCurrentList.orEmpty()
+        val suggestionsList = (binding?.searchSuggestionsRecycler?.adapter as? SearchSuggestionAdapter)?.immutableCurrentList.orEmpty()
+        val hasSuggestions = !showHistory && isSearchSuggestionsEnabled && suggestionsList.isNotEmpty()
+        binding?.apply {
+            searchHistoryEmptyView.isVisible = showHistory && historyList.isEmpty()
+            searchHistoryRecycler.isVisible = showHistory && historyList.isNotEmpty()
+            searchSuggestionsRecycler.isVisible = hasSuggestions
+            searchMasterRecycler.isVisible = !showHistory && !hasSuggestions && isAdvancedSearch
+            searchAutofitResults.isVisible = !showHistory && !hasSuggestions && !isAdvancedSearch
+        }
+    }
+
+    private fun submitSearch(query: String) {
+        searchQueryState.value = query
+        binding?.mainSearch?.setQuery(query, false)
+        search(query)
+        searchViewModel.clearSuggestions()
+        val settingsManager = context?.let { PreferenceManager.getDefaultSharedPreferences(it) }
+        val isAdvancedSearch = settingsManager?.getBoolean("advanced_search", true) ?: true
+        binding?.apply {
+            searchSuggestionsRecycler.isVisible = false
+            searchHistoryRecycler.isVisible = false
+            searchHistoryEmptyView.isVisible = false
+            searchMasterRecycler.isVisible = isAdvancedSearch
+            searchAutofitResults.isVisible = !isAdvancedSearch
+        }
+        view?.let { hideKeyboard(it) }
+    }
+
     private val speechRecognizerLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
@@ -120,7 +183,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 val matches = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
                 if (!matches.isNullOrEmpty()) {
                     val recognizedText = matches[0]
-                    binding?.mainSearch?.setQuery(recognizedText, true)
+                    submitSearch(recognizedText)
                 }
             }
         }
@@ -213,7 +276,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     DataStoreHelper.searchPreferenceTags = list
                     selectedSearchTypes.clear()
                     selectedSearchTypes.addAll(list)
-                    search(binding?.mainSearch?.query?.toString())
+                    search(searchQueryState.value.ifBlank { binding?.mainSearch?.query?.toString() })
                 }
             }
         }
@@ -238,6 +301,23 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
     ) {
         reloadRepos()
         binding.apply {
+            searchHeaderComposeView.apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                setContent {
+                    LiquidGlassTheme {
+                        SearchHeaderBar(
+                            query = searchQueryState.value,
+                            onQueryChange = { newText -> onSearchQueryChanged(newText) },
+                            onSearch = { query -> submitSearch(query) },
+                            onClear = { onSearchQueryChanged("") },
+                            onVoiceClick = { binding.voiceSearch.performClick() },
+                            onFilterClick = { binding.searchFilter.performClick() },
+                            isLoading = isSearchLoadingState.value,
+                        )
+                    }
+                }
+            }
+
             val adapter =
                 SearchAdapter(
                     searchAutofitResults,
@@ -245,11 +325,25 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     SearchHelper.handleSearchClickCallback(callback)
                 }
 
-            searchRoot.findViewById<TextView>(androidx.appcompat.R.id.search_src_text)?.tag =
-                "tv_no_focus_tag"
+            context?.let { ctx ->
+                androidx.core.content.res.ResourcesCompat.getFont(ctx, com.lagradost.cloudstream3.R.font.outfit_semibold)?.let { tf ->
+                    searchTitle.typeface = tf
+                }
+            }
             searchAutofitResults.setRecycledViewPool(SearchAdapter.sharedPool)
             searchAutofitResults.adapter = adapter
             searchLoadingBar.alpha = 0f
+            voiceSearchContainer.setOnClickListener { voiceSearch.performClick() }
+            searchFilterContainer.setOnClickListener { searchFilter.performClick() }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            PosterCardStyleRepository.state.collect {
+                val span = context?.getPosterSpanCount() ?: 3
+                binding.searchAutofitResults.spanCount = span
+                (binding.searchAutofitResults.adapter as? SearchAdapter)?.notifyDataSetChanged()
+                (binding.searchMasterRecycler.adapter as? ParentItemAdapter)?.notifyDataSetChanged()
+            }
         }
 
         binding.voiceSearch.setOnClickListener { searchView ->
@@ -278,8 +372,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             }
         }
 
-        val searchExitIcon =
-            binding.mainSearch.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)
+        val searchExitIcon: ImageView? = null
 
         selectedApis = DataStoreHelper.searchPreferenceProviders.toMutableSet()
 
@@ -399,7 +492,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
                         // run search when dialog is close
                         if (previousSelectedApis != selectedApis.toSet() || previousSelectedSearchTypes != selectedSearchTypes.toSet()) {
-                            search(binding.mainSearch.query.toString())
+                            search(searchQueryState.value.ifBlank { binding.mainSearch.query.toString() })
                         }
                     }
                     updateList(selectedSearchTypes.toList())
@@ -430,37 +523,14 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
         binding.mainSearch.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
-                search(query)
-                searchViewModel.clearSuggestions()
-
-                binding.mainSearch.let {
-                    hideKeyboard(it)
-                }
-
+                submitSearch(query)
                 return true
             }
 
             override fun onQueryTextChange(newText: String): Boolean {
-                //searchViewModel.quickSearch(newText)
-                val showHistory = newText.isBlank()
-                if (showHistory) {
-                    searchViewModel.clearSearch()
-                    searchViewModel.updateHistory()
-                    searchViewModel.clearSuggestions()
-                } else {
-                    // Fetch suggestions when user is typing (if enabled)
-                    if (isSearchSuggestionsEnabled) {
-                        searchViewModel.fetchSuggestions(newText)
-                    }
+                if (searchQueryState.value != newText) {
+                    onSearchQueryChanged(newText)
                 }
-                binding.apply {
-                    searchHistoryRecycler.isVisible = showHistory
-                    searchMasterRecycler.isVisible = !showHistory && isAdvancedSearch
-                    searchAutofitResults.isVisible = !showHistory && !isAdvancedSearch
-                    // Hide suggestions when showing history or showing search results
-                    searchSuggestionsRecycler.isVisible = !showHistory && isSearchSuggestionsEnabled
-                }
-
                 return true
             }
         })
@@ -476,17 +546,20 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                             )
                         }
                     }
+                    isSearchLoadingState.value = false
                     searchExitIcon?.alpha = 1f
                     binding.searchLoadingBar.alpha = 0f
                 }
 
                 is Resource.Failure -> {
                     // Toast.makeText(activity, "Server error", Toast.LENGTH_LONG).show()
+                    isSearchLoadingState.value = false
                     searchExitIcon?.alpha = 1f
                     binding.searchLoadingBar.alpha = 0f
                 }
 
                 is Resource.Loading -> {
+                    isSearchLoadingState.value = true
                     searchExitIcon?.alpha = 0f
                     binding.searchLoadingBar.alpha = 1f
                 }
@@ -567,7 +640,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                             binding.tvtypesChipsScroll.tvtypesChips,
                             searchItem.type.toMutableList()
                         )
-                    binding.mainSearch.setQuery(searchItem.searchText, true)
+                    submitSearch(searchItem.searchText)
                 }
 
                 SEARCH_HISTORY_REMOVE -> {
@@ -618,12 +691,11 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             when (callback.clickAction) {
                 SEARCH_SUGGESTION_CLICK -> {
                     // Search directly
-                    binding.mainSearch.setQuery(callback.suggestion, true)
-                    searchViewModel.clearSuggestions()
+                    submitSearch(callback.suggestion)
                 }
                 SEARCH_SUGGESTION_FILL -> {
                     // Fill the search box without searching
-                    binding.mainSearch.setQuery(callback.suggestion, false)
+                    onSearchQueryChanged(callback.suggestion)
                 }
                 SEARCH_SUGGESTION_CLEAR -> {
                     // Clear suggestions (from footer button)
@@ -657,10 +729,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             sq?.let { query ->
                 if (query.isBlank()) return@let
 
-                // Queries are dropped if you are submitted before layout finishes
-                mainSearch.doOnLayout {
-                    mainSearch.setQuery(query, true)
-                }
+                submitSearch(query)
                 // Clear the query as to not make it request the same query every time the page is opened
                 arguments?.remove(SEARCH_QUERY)
                 savedInstanceState?.remove(SEARCH_QUERY)
@@ -670,6 +739,9 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
         observe(searchViewModel.currentHistory) { list ->
             (binding.searchHistoryRecycler.adapter as? SearchHistoryAdaptor?)?.submitList(list)
+            val isQueryBlank = searchQueryState.value.isBlank() && binding.mainSearch.query.isNullOrBlank()
+            binding.searchHistoryEmptyView.isVisible = isQueryBlank && list.isEmpty()
+            binding.searchHistoryRecycler.isVisible = isQueryBlank && list.isNotEmpty()
              // Scroll to top to show newest items (list is sorted by newest first)
             if (list.isNotEmpty()) {
                 binding.searchHistoryRecycler.scrollToPosition(0)
@@ -678,9 +750,17 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
         // Observe search suggestions
         observe(searchViewModel.searchSuggestions) { suggestions ->
-            val hasSuggestions = suggestions.isNotEmpty()
-            binding.searchSuggestionsRecycler.isVisible = hasSuggestions
+            val isQueryBlank = searchQueryState.value.isBlank() && binding.mainSearch.query.isNullOrBlank()
+            val hasSuggestions = !isQueryBlank && suggestions.isNotEmpty()
             (binding.searchSuggestionsRecycler.adapter as? SearchSuggestionAdapter?)?.submitList(suggestions)
+            binding.searchSuggestionsRecycler.isVisible = hasSuggestions
+
+            if (hasSuggestions) {
+                binding.searchMasterRecycler.isVisible = false
+                binding.searchAutofitResults.isVisible = false
+                binding.searchHistoryRecycler.isVisible = false
+                binding.searchHistoryEmptyView.isVisible = false
+            }
 
             // On non-phone layouts, redirect focus and handle back button
             if (!isLayout(PHONE)) {

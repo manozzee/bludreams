@@ -2,20 +2,33 @@ package com.lagradost.cloudstream3.ui.settings
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -23,10 +36,10 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -42,11 +55,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -61,14 +76,19 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CommonActivity.activity
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.utils.DataStoreHelper
+import androidx.activity.ComponentActivity
+import com.lagradost.cloudstream3.utils.DataStoreHelper.Account
 import com.lagradost.cloudstream3.utils.DataStoreHelper.profileImages
 import com.lagradost.cloudstream3.utils.GitInfo.currentCommitHash
 import com.lagradost.cloudstream3.utils.UIHelper.clipboardHelper
@@ -76,15 +96,15 @@ import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream3.utils.txt
 import com.lagradost.cloudstream4.compose.Screen
 import com.lagradost.cloudstream4.compose.TV
-import com.lagradost.cloudstream4.compose.circleBorder
 import com.lagradost.cloudstream4.compose.focusOutline
 import com.lagradost.cloudstream4.compose.isLayout
 import com.lagradost.cloudstream4.theme.CloudStreamPreviewTheme
-import com.mihon.material.padding
 import com.mihon.presentation.settings.SearchableSettings
 import com.mihon.presentation.settings.SettingSearchResults
 import com.mihon.presentation.settings.SettingsData
-import com.mihon.presentation.settings.widget.TextPreferenceWidget
+import com.mihon.presentation.settings.widget.GroupPosition
+import com.mihon.presentation.settings.widget.PreferenceGroupHeader
+import com.mihon.presentation.settings.widget.settingsCard
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
@@ -121,12 +141,6 @@ object SettingsFragmentScreen : Screen {
                 R.string.pref_category_cache
             )
         ),
-        /*SettingsNavigation(
-            title = R.string.category_providers,
-            navigation = R.id.action_navigation_global_to_navigation_settings_providers,
-            screen = SettingsProvidersScreen,
-            icon = R.drawable.build_24px,
-        ),*/
         SettingsNavigation(
             title = R.string.category_ui,
             navigation = R.id.action_navigation_global_to_navigation_settings_ui,
@@ -179,14 +193,14 @@ object SettingsFragmentScreen : Screen {
         val subtitle: PersistentList<Int>,
     )
 
-
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     override fun Content() {
         val textFieldState = rememberTextFieldState()
-
+        var isSearchOpen by remember { mutableStateOf(false) }
         val outerListState = rememberScrollState()
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
         val parentFirstScrollConnection = remember {
             object : NestedScrollConnection {
@@ -202,59 +216,59 @@ object SettingsFragmentScreen : Screen {
             }
         }
 
-        Scaffold { _ ->
-            Column(modifier = Modifier.verticalScroll(outerListState)) {
-                Spacer(modifier = Modifier.height(MaterialTheme.padding.small))
-
-                val default = DataStoreHelper.getDefaultAccount(
-                    LocalContext.current
-                )
-                val flow by DataStoreHelper.selectedAccountNumberFlow.collectAsState()
-                val account = remember(flow) {
-                    DataStoreHelper.getCurrentAccount() ?: default
-                }
-
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+        ) { _ ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(outerListState)
+                    .padding(top = statusBarTop),
+            ) {
+                // Top Bar
                 Row(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .focusOutline()
-                        .clickable {
-                            activity.navigate(
-                                R.id.accountSelectActivity,
-                                Bundle().apply { putBoolean("isFromMainActivity", true) }
-                            )
-                        }
-                        .padding(
-                            vertical = MaterialTheme.padding.large,
-                            horizontal = MaterialTheme.padding.medium
-                        )
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val image =
-                        account.customImage ?: profileImages.getOrNull(account.defaultImageIndex)
-                        ?: profileImages.first()
-
-                    AsyncImage(
-                        contentScale = ContentScale.Crop,
-                        model = image,
-                        modifier = Modifier.circleBorder(50.dp),
-                        contentDescription = null,
+                    Text(
+                        text = stringResource(R.string.title_settings),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 24.sp,
+                            color = Color.White,
+                        ),
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(modifier = Modifier.width(MaterialTheme.padding.medium))
-                    Column {
-                        Text(
-                            text = account.name,
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        Text(
-                            text = stringResource(R.string.title_settings),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
+
+                    // Circular Search Button
+                    com.lagradost.cloudstream3.ui.liquidglass.CircularActionButton(
+                        painter = painterResource(if (isSearchOpen) R.drawable.close_24px else R.drawable.search_icon),
+                        contentDescription = "Search",
+                        isActive = isSearchOpen,
+                        onClick = {
+                            isSearchOpen = !isSearchOpen
+                            if (!isSearchOpen) {
+                                textFieldState.edit { replace(0, length, "") }
+                            }
+                        },
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(MaterialTheme.padding.small))
-                SettingsSearch(textFieldState = textFieldState)
-                Spacer(modifier = Modifier.height(MaterialTheme.padding.small))
+                // Expandable Search Bar
+                AnimatedVisibility(
+                    visible = isSearchOpen,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SettingsSearch(textFieldState = textFieldState)
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                }
 
                 SettingSearchResults(
                     nestedScrollConnection = parentFirstScrollConnection,
@@ -263,18 +277,252 @@ object SettingsFragmentScreen : Screen {
                     onItemClick = { item ->
                         SearchableSettings.highlightKey = item.highlightKey
                         activity?.navigate(item.navigation)
-                    }, empty = {
+                    },
+                    empty = {
                         Column(
-                            modifier = Modifier
-                                .nestedScroll(parentFirstScrollConnection)
+                            modifier = Modifier.nestedScroll(parentFirstScrollConnection)
                         ) {
-                            screens.forEach { settingsTab ->
-                                SettingsTab(settingsTab)
+                            // Section 1: User Profile
+                            val default = DataStoreHelper.getDefaultAccount(LocalContext.current)
+                            val flow by DataStoreHelper.selectedAccountNumberFlow.collectAsState()
+                            val account = remember(flow) {
+                                DataStoreHelper.getCurrentAccount() ?: default
                             }
-                            BuildStamp()
-                        }
-                    })
 
+                            PreferenceGroupHeader(title = "User Profile")
+                            AccountCard(
+                                account = account,
+                                onClick = {
+                                    activity.navigate(
+                                        R.id.accountSelectActivity,
+                                        Bundle().apply { putBoolean("isFromMainActivity", true) }
+                                    )
+                                }
+                            )
+
+                            // Section 2: Services & Add-ons
+                            PreferenceGroupHeader(title = "Services & Add-ons")
+                            SettingsNavRow(
+                                title = stringResource(R.string.pref_category_extensions),
+                                subtitle = "Plugins, sources & repository management",
+                                icon = R.drawable.extension_24px,
+                                position = GroupPosition.First,
+                                onClick = {
+                                    SearchableSettings.highlightKey = null
+                                    activity?.navigate(R.id.action_navigation_global_to_navigation_settings_extensions)
+                                }
+                            )
+                            SettingsNavRow(
+                                title = stringResource(R.string.test_extensions),
+                                subtitle = stringResource(R.string.test_extensions_summary),
+                                icon = R.drawable.baseline_network_ping_24,
+                                position = GroupPosition.Last,
+                                onClick = {
+                                    activity?.navigate(R.id.navigation_test_providers)
+                                }
+                            )
+
+                            // Section 3: Playback & UI
+                            PreferenceGroupHeader(title = "Playback & UI")
+                            SettingsNavRow(
+                                title = "Appearance & Visuals",
+                                subtitle = "Themes, colors, layout & poster card style",
+                                icon = R.drawable.format_paint_24px,
+                                position = GroupPosition.First,
+                                onClick = {
+                                    SearchableSettings.highlightKey = null
+                                    activity?.navigate(R.id.action_navigation_global_to_navigation_settings_ui)
+                                }
+                            )
+                            SettingsNavRow(
+                                title = "Playback & Gestures",
+                                subtitle = "Subtitles, streaming quality, gestures & decoder",
+                                icon = R.drawable.play_arrow_24px,
+                                position = GroupPosition.Last,
+                                onClick = {
+                                    SearchableSettings.highlightKey = null
+                                    activity?.navigate(R.id.action_navigation_global_to_navigation_settings_player)
+                                }
+                            )
+
+                            // Section 4: System & Management
+                            PreferenceGroupHeader(title = "System & Management")
+                            SettingsNavRow(
+                                title = stringResource(R.string.category_general),
+                                subtitle = "App language, downloads, DNS bypass & network",
+                                icon = R.drawable.build_24px,
+                                position = GroupPosition.First,
+                                onClick = {
+                                    SearchableSettings.highlightKey = null
+                                    activity?.navigate(R.id.action_navigation_global_to_navigation_settings_general)
+                                }
+                            )
+                            SettingsNavRow(
+                                title = stringResource(R.string.category_updates),
+                                subtitle = "App updates, backup & restore, export data",
+                                icon = R.drawable.mobile_arrow_down_24px,
+                                position = GroupPosition.Middle,
+                                onClick = {
+                                    SearchableSettings.highlightKey = null
+                                    activity?.navigate(R.id.action_navigation_global_to_navigation_settings_updates)
+                                }
+                            )
+                            SettingsNavRow(
+                                title = stringResource(R.string.category_account),
+                                subtitle = "Sync accounts, app lock & authentication",
+                                icon = R.drawable.encrypted_24px,
+                                position = GroupPosition.Last,
+                                onClick = {
+                                    SearchableSettings.highlightKey = null
+                                    activity?.navigate(R.id.action_navigation_global_to_navigation_settings_account)
+                                }
+                            )
+
+                            BuildStamp()
+                            Spacer(modifier = Modifier.height(110.dp))
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun AccountCard(account: Account, onClick: () -> Unit) {
+        val image = account.customImage ?: profileImages.getOrNull(account.defaultImageIndex)
+            ?: profileImages.first()
+
+        Column(
+            modifier = Modifier.settingsCard(GroupPosition.Single),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = 64.dp)
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AsyncImage(
+                    contentScale = ContentScale.Crop,
+                    model = image,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, Color.White.copy(alpha = 0.25f), CircleShape),
+                    contentDescription = null,
+                )
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = account.name,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Switch profile or manage account",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                            color = Color.White.copy(alpha = 0.65f),
+                            fontSize = 13.sp,
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                Icon(
+                    painter = painterResource(R.drawable.ic_baseline_keyboard_arrow_right_24),
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.38f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun SettingsNavRow(
+        title: String,
+        subtitle: String,
+        icon: Int,
+        position: GroupPosition,
+        onClick: () -> Unit,
+        tileColor: Color? = null,
+    ) {
+        val bg = tileColor ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+        Column(
+            modifier = Modifier.settingsCard(position),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = 60.dp)
+                    .clickable(onClick = onClick)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Leading Icon Tile
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(bg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(icon),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                // Trailing Chevron
+                Icon(
+                    painter = painterResource(R.drawable.ic_baseline_keyboard_arrow_right_24),
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.38f),
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
     }
@@ -291,141 +539,9 @@ object SettingsFragmentScreen : Screen {
             )
         }.toPersistentList()
 
-    @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
     @Composable
     fun SettingsSearch(textFieldState: TextFieldState) {
-        var hasFocus by remember { mutableStateOf(false) }
-        var isWritable by remember { mutableStateOf(false) }
-        val focusProgress by animateFloatAsState(targetValue = if (hasFocus) 1.0f else 0.0f)
-        val focusManager = LocalFocusManager.current
-        val focusRequester = remember { FocusRequester() }
-        val isTv = isLayout(TV)
-        TextField(
-            state = textFieldState,
-            keyboardOptions = KeyboardOptions.Default.copy(
-                imeAction = ImeAction.Search,
-                /**
-                 * We do not want to pull up the keyboard when navigating to the item on TV, therefore
-                 * we listen to when the TV user presses some key to "extra" focus it
-                 *
-                 * showKeyboardOnFocus is somewhat bugged, so need to change this to true when you
-                 * press it, as otherwise no keyboard will show even with keyboardController
-                 * */
-                showKeyboardOnFocus = if (isTv) isWritable else true
-            ),
-            lineLimits = TextFieldLineLimits.SingleLine,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp - 12.dp * focusProgress)
-                .focusOutline(enabled = isTv, CircleShape)
-                .onFocusChanged { newFocus ->
-                    hasFocus = newFocus.hasFocus
-                    /** Loss of focus -> readonly */
-                    if (!newFocus.hasFocus) {
-                        isWritable = false
-                    }
-                }
-                .focusRequester(focusRequester)
-                .onPreviewKeyEvent { keyEvent ->
-                    if (isWritable || !isTv || !hasFocus || keyEvent.type != KeyEventType.KeyUp) {
-                        return@onPreviewKeyEvent false
-                    }
-
-                    /** Focus + press once -> writable */
-                    return@onPreviewKeyEvent when (keyEvent.key) {
-                        Key.Enter, Key.DirectionCenter, Key.NumPadEnter, Key.Spacebar -> {
-                            isWritable = true
-                            true
-                        }
-
-                        else -> false
-                    }
-                },
-            placeholder = {
-                Text(text = stringResource(R.string.search_hint))
-            },
-            shape = CircleShape,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedLeadingIconColor = MaterialTheme.colorScheme.onBackground,
-                unfocusedTrailingIconColor = MaterialTheme.colorScheme.onBackground,
-                focusedTrailingIconColor = MaterialTheme.colorScheme.onBackground,
-                focusedLeadingIconColor = MaterialTheme.colorScheme.onBackground,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                cursorColor = MaterialTheme.colorScheme.onBackground,
-            ),
-            leadingIcon = {
-                Crossfade(
-                    targetState = hasFocus,
-                    label = "leftsearch",
-                ) { value ->
-                    if (value) {
-                        IconButton(onClick = {
-                            textFieldState.edit { replace(0, length, "") }
-                            focusManager.clearFocus()
-                        }) {
-                            Icon(
-                                painter = painterResource(R.drawable.keyboard_arrow_left_24px),
-                                contentDescription = null
-                            )
-                        }
-                    } else {
-                        IconButton(onClick = {
-                            focusRequester.requestFocus()
-                        }) {
-                            Icon(
-                                painter = painterResource(R.drawable.search_icon),
-                                contentDescription = null
-                            )
-                        }
-                    }
-                }
-            },
-            trailingIcon = {
-                Crossfade(
-                    targetState = hasFocus,
-                    label = "rightsearch",
-                ) { value ->
-                    if (value) {
-                        IconButton(onClick = {
-                            textFieldState.edit { replace(0, length, "") }
-                        }) {
-                            Icon(
-                                painter = painterResource(R.drawable.close_24px),
-                                contentDescription = null
-                            )
-                        }
-                    }
-                }
-            },
-        )
-
-        val keyboardController = LocalSoftwareKeyboardController.current
-        DisposableEffect(Unit) {
-            onDispose {
-                keyboardController?.hide()
-            }
-        }
-    }
-
-    @Composable
-    fun SettingsTab(settingsTab: SettingsNavigation) {
-        TextPreferenceWidget(
-            title = stringResource(settingsTab.title),
-            icon = painterResource(settingsTab.icon),
-            // This can not be converted to joinToString due to stringResource being composable
-            subtitle =
-                @Suppress("SimplifiableCallChain")
-                settingsTab.subtitle.map { stringResource(it) }.joinToString(),
-            // Clear it if we have already set it but navigated back instantly
-            onPreferenceClick = {
-                SearchableSettings.highlightKey = null
-                activity?.navigate(settingsTab.navigation)
-            })
+        com.lagradost.cloudstream3.ui.liquidglass.SettingsSearchBox(textFieldState = textFieldState)
     }
 
     @Composable
@@ -442,12 +558,11 @@ object SettingsFragmentScreen : Screen {
         }
 
         Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
-                .focusOutline()
+                .padding(top = 24.dp, bottom = 8.dp)
                 .clickable {
                     clipboardHelper(
                         txt(R.string.extension_version),
@@ -455,19 +570,17 @@ object SettingsFragmentScreen : Screen {
                     )
                 },
         ) {
-            ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
-                Text(text = BuildConfig.VERSION_NAME)
-                if (commitHash != "") {
-                    Text("•")
-                    Text(text = commitHash)
-                }
-                Text("•")
-                Text(text = buildTimestamp)
-            }
+            Text(
+                text = "CloudStream v${BuildConfig.VERSION_NAME}" + if (commitHash.isNotEmpty()) " • $commitHash" else "",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                    color = Color.White.copy(alpha = 0.38f),
+                    fontSize = 12.sp,
+                ),
+            )
         }
     }
 }
-
 
 @PreviewLightDark
 @Composable

@@ -29,10 +29,9 @@
                     android:paddingTop="10dp"
                     android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
                     android:paddingBottom="10dp"
+                    android:textAppearance="@style/TextAppearance.CloudStream.SectionHeader"
                     android:text="@string/video_tracks"
-                    android:textColor="?attr/textColor"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+                    android:textSize="13.5sp" />
 
             <ListView
                     android:requiresFadingEdge="vertical"
@@ -77,10 +76,9 @@
                             android:layout_height="wrap_content"
                             android:paddingStart="?android:attr/listPreferredItemPaddingStart"
                             android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
+                            android:textAppearance="@style/TextAppearance.CloudStream.SectionHeader"
                             android:text="@string/audio_tracks"
-                            android:textColor="?attr/textColor"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
+                            android:textSize="13.5sp" />
 
 <!--                    <TextView-->
 <!--                            android:textSize="15sp"-->

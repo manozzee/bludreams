@@ -1,12 +1,16 @@
 package com.mihon.presentation.settings
 
-import com.mihon.presentation.settings.widget.ColorPreferenceWidget
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,19 +19,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mihon.material.BaseSliderItem
+import com.mihon.presentation.settings.widget.CardBackgroundColor
+import com.mihon.presentation.settings.widget.ColorPreferenceWidget
 import com.mihon.presentation.settings.widget.EditTextPreferenceWidget
+import com.mihon.presentation.settings.widget.GroupPosition
 import com.mihon.presentation.settings.widget.InfoWidget
 import com.mihon.presentation.settings.widget.ListPreferenceWidget
+import com.mihon.presentation.settings.widget.LocalGroupPosition
 import com.mihon.presentation.settings.widget.MultiSelectListPreferenceWidget
-import com.mihon.presentation.settings.widget.PrefsHorizontalPadding
-import com.mihon.presentation.settings.widget.PrefsVerticalPadding
 import com.mihon.presentation.settings.widget.SwitchPreferenceWidget
 import com.mihon.presentation.settings.widget.TextPreferenceWidget
-import com.mihon.presentation.settings.widget.TitleFontSize
+import com.mihon.presentation.settings.widget.settingsCard
 import kotlinx.coroutines.launch
 
 val LocalPreferenceHighlighted = compositionLocalOf(structuralEqualityPolicy()) { false }
@@ -92,7 +102,7 @@ internal fun PreferenceItem(
                     color = derivedColor,
                     onValueChange = { newValue ->
                         scope.launch {
-                            if(item.onValueChanged(newValue.toArgb())) {
+                            if (item.onValueChanged(newValue.toArgb())) {
                                 item.preference.set(newValue.toArgb())
                             }
                         }
@@ -161,6 +171,7 @@ internal fun PreferenceItem(
                     },
                 )
             }
+
             is Preference.PreferenceItem.InfoPreference -> {
                 InfoWidget(text = item.title)
             }
@@ -171,28 +182,42 @@ internal fun PreferenceItem(
 
             is Preference.PreferenceItem.SliderPreference -> {
                 val state by item.preference.collectAsState()
-                BaseSliderItem(
-                    value = state,
-                    valueRange = item.valueRange,
-                    steps = item.steps,
-                    title = item.title,
-                    subtitle = item.subtitle,
-                    valueString = item.valueString.takeUnless { it.isNullOrEmpty() }
-                        ?: state.toString(),
-                    onChange = { newValue ->
-                        scope.launch {
-                            if(item.onValueChanged(newValue)) {
-                                item.preference.set(newValue)
+                val groupPosition = LocalGroupPosition.current
+
+                Column(
+                    modifier = Modifier.settingsCard(groupPosition),
+                ) {
+                    BaseSliderItem(
+                        value = state,
+                        valueRange = item.valueRange,
+                        steps = item.steps,
+                        title = item.title,
+                        subtitle = item.subtitle,
+                        valueString = item.valueString.takeUnless { it.isNullOrEmpty() }
+                            ?: state.toString(),
+                        onChange = { newValue ->
+                            scope.launch {
+                                if (item.onValueChanged(newValue)) {
+                                    item.preference.set(newValue)
+                                }
                             }
-                        }
-                    },
-                    titleStyle = MaterialTheme.typography.titleLarge.copy(fontSize = TitleFontSize),
-                    modifier = Modifier.padding(
-                        horizontal = PrefsHorizontalPadding,
-                        vertical = PrefsVerticalPadding,
-                    ),
-                    icon = item.icon
-                )
+                        },
+                        titleStyle = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            color = Color.White,
+                        ),
+                        subtitleStyle = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.65f),
+                        ),
+                        modifier = Modifier.padding(
+                            horizontal = 16.dp,
+                            vertical = 12.dp,
+                        ),
+                        icon = item.icon,
+                    )
+                }
             }
         }
     }

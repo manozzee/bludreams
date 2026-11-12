@@ -1,43 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/suggestion_item"
     android:layout_width="match_parent"
-    android:layout_height="48dp"
-    android:background="?attr/selectableItemBackground"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingStart="16dp"
-    android:paddingEnd="8dp">
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="6dp"
+    android:foreground="?android:attr/selectableItemBackground"
+    android:focusable="true"
+    android:clickable="true"
+    app:cardBackgroundColor="?attr/primaryGrayBackground"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:cardMaxElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#14FFFFFF">
 
-    <ImageView
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:contentDescription="@string/search_hint"
-        android:src="@drawable/search_icon"
-        app:tint="?attr/textColor" />
-
-    <TextView
-        android:id="@+id/suggestion_text"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_weight="1"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="?attr/textColor"
-        android:textSize="18sp"
-        tools:text="Search suggestion" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
-    <ImageView
-        android:id="@+id/suggestion_fill"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/search_hint"
-        android:padding="8dp"
-        android:src="@drawable/ic_baseline_north_west_24"
-        app:tint="?attr/textColor" />
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            app:cardBackgroundColor="?attr/iconGrayBackground"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="0dp"
+            app:cardMaxElevation="0dp"
+            app:strokeWidth="0dp">
 
-</LinearLayout>
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/search_hint"
+                android:src="@drawable/search_icon"
+                app:tint="?attr/textColor" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/suggestion_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="?attr/textColor"
+            android:textSize="15sp"
+            tools:text="Search suggestion" />
+
+        <ImageView
+            android:id="@+id/suggestion_fill"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/search_hint"
+            android:padding="8dp"
+            android:src="@drawable/ic_baseline_north_west_24"
+            app:tint="?attr/grayTextColor" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

@@ -18,6 +18,7 @@ import com.lagradost.cloudstream3.ui.ViewHolderState
 import com.lagradost.cloudstream3.ui.download.button.DownloadStatusTell
 import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
 import com.lagradost.cloudstream3.utils.DataStoreHelper.getViewPos
+import com.lagradost.cloudstream3.utils.GroupCardHelper
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.downloader.DownloadObjects
 
@@ -382,16 +383,23 @@ class DownloadAdapter(
         item: VisualDownloadCached,
         position: Int
     ) {
+        val groupPos = GroupCardHelper.getGroupPosition(position, immutableCurrentList.size)
         when (val binding = holder.view) {
-            is DownloadHeaderEpisodeBinding -> bindHeader(
-                binding,
-                item as? VisualDownloadCached.Header
-            )
+            is DownloadHeaderEpisodeBinding -> {
+                GroupCardHelper.applyGroupCardStyle(binding.episodeHolder, groupPos)
+                bindHeader(
+                    binding,
+                    item as? VisualDownloadCached.Header
+                )
+            }
 
-            is DownloadChildEpisodeBinding -> bindChild(
-                binding,
-                item as? VisualDownloadCached.Child
-            )
+            is DownloadChildEpisodeBinding -> {
+                GroupCardHelper.applyGroupCardStyle(binding.downloadChildEpisodeHolder, groupPos)
+                bindChild(
+                    binding,
+                    item as? VisualDownloadCached.Child
+                )
+            }
         }
     }
 

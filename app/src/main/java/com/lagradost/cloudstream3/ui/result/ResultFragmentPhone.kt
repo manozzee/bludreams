@@ -24,6 +24,25 @@ import androidx.core.view.isVisible
 import androidx.core.widget.NestedScrollView
 import androidx.core.widget.doOnTextChanged
 import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.preference.PreferenceManager
+import com.lagradost.cloudstream3.MainActivity
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import android.app.Activity
+import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.ui.details.DetailsScreen
+import com.lagradost.cloudstream3.ui.details.TrailerMirror
+import com.lagradost.cloudstream3.ui.player.ExtractorUri
+import com.lagradost.cloudstream3.ui.player.GeneratorPlayer
+import com.lagradost.cloudstream3.ui.player.SubtitleData
+import com.lagradost.cloudstream3.ui.player.VideoGenerator
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.UIHelper.navigate
+import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
+import com.lagradost.cloudstream3.ui.search.SearchClickCallback
 import androidx.lifecycle.viewModelScope
 import com.discord.panels.OverlappingPanelsLayout
 import com.discord.panels.PanelState
@@ -111,10 +130,41 @@ import kotlin.math.roundToInt
 open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
     BindingCreator.Inflate(FragmentResultSwipeBinding::inflate)
 ), PlayerView.Callbacks {
+    private fun updateComposeGestureRegions() {
+        val composeView = binding?.resultComposeView ?: return
+        if (!composeView.isVisible) return
+        composeView.post {
+            if (!isAdded || binding == null) return@post
+            val location = IntArray(2)
+            composeView.getLocationInWindow(location)
+            val fullRect = Rect(
+                0,
+                0,
+                location[0] + composeView.width.coerceAtLeast(10000),
+                location[1] + composeView.height.coerceAtLeast(10000)
+            )
+            binding?.resultOverlappingPanels?.setChildGestureRegions(listOf(fullRect))
+        }
+        PanelsChildGestureRegionObserver.Provider.get().register(composeView)
+    }
+
     private val gestureRegionsListener =
         object : PanelsChildGestureRegionObserver.GestureRegionsListener {
             override fun onGestureRegionsUpdate(gestureRegions: List<Rect>) {
-                binding?.resultOverlappingPanels?.setChildGestureRegions(gestureRegions)
+                val composeView = binding?.resultComposeView
+                if (composeView != null && composeView.isVisible) {
+                    val location = IntArray(2)
+                    composeView.getLocationInWindow(location)
+                    val fullRect = Rect(
+                        0,
+                        0,
+                        location[0] + composeView.width.coerceAtLeast(10000),
+                        location[1] + composeView.height.coerceAtLeast(10000)
+                    )
+                    binding?.resultOverlappingPanels?.setChildGestureRegions(listOf(fullRect))
+                } else {
+                    binding?.resultOverlappingPanels?.setChildGestureRegions(gestureRegions)
+                }
             }
         }
 
@@ -216,7 +266,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
     ) {}
 
     override fun fixLayout(view: View) {
-        fixSystemBarsPadding(view)
+        fixSystemBarsPadding(view, padTop = false)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -231,7 +281,9 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
 
     override fun nextMirror() {
         currentTrailerIndex++
-        loadTrailer()
+        if (binding?.resultComposeView?.isVisible != true) {
+            loadTrailer()
+        }
     }
 
     override fun hasNextMirror(): Boolean {
@@ -327,12 +379,22 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         context?.updateHasTrailers()
         if (!LoadResponse.isTrailersEnabled) return
         currentTrailers = trailers?.sortedBy { -it.first.quality } ?: emptyList()
-        loadTrailer()
+        if (binding?.resultComposeView?.isVisible != true) {
+            if (binding?.resultComposeView?.isVisible != true) {
+            loadTrailer()
+        }
+        }
+        if (binding?.resultComposeView?.isVisible != true) {
+            loadTrailer()
+        }
     }
 
     override fun onDestroyView() {
         PanelsChildGestureRegionObserver.Provider.get().let { obs ->
             resultBinding?.resultCastItems?.let {
+                obs.unregister(it)
+            }
+            binding?.resultComposeView?.let {
                 obs.unregister(it)
             }
 
@@ -414,6 +476,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         super.onResume()
         PanelsChildGestureRegionObserver.Provider.get()
             .addGestureRegionsUpdateListener(gestureRegionsListener)
+        updateComposeGestureRegions()
     }
 
     override fun onStop() {
@@ -428,11 +491,37 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         viewModel.reloadEpisodes()
     }
 
+    private class ComposeStateHolder(
+        viewModel: ResultViewModel2
+    ) {
+        var page by mutableStateOf<Resource<ResultData>?>(viewModel.page.value)
+        var episodes by mutableStateOf<Resource<List<ResultEpisode>>?>(viewModel.episodes.value)
+        var movie by mutableStateOf<Resource<Pair<com.lagradost.cloudstream3.utils.UiText, ResultEpisode>>?>(viewModel.movie.value)
+        var episodesCount by mutableStateOf<com.lagradost.cloudstream3.utils.UiText?>(viewModel.episodesCountText.value)
+        var resumeWatching by mutableStateOf<ResumeWatchingStatus?>(viewModel.resumeWatching.value)
+        var trailers by mutableStateOf<List<ExtractedTrailerData>>(viewModel.trailers.value.orEmpty())
+        var watchStatus by mutableStateOf(viewModel.watchStatus.value ?: WatchType.NONE)
+        var isFavorite by mutableStateOf<Boolean?>(viewModel.favoriteStatus.value)
+        var isSubscribed by mutableStateOf<Boolean?>(viewModel.subscribeStatus.value)
+        var seasonSelections by mutableStateOf(viewModel.seasonSelections.value.orEmpty())
+        var selectedSeason by mutableStateOf(viewModel.selectedSeason.value)
+        var dubSubSelections by mutableStateOf(viewModel.dubSubSelections.value.orEmpty())
+        var selectedDubStatus by mutableStateOf(viewModel.selectedDubStatus.value)
+        var rangeSelections by mutableStateOf(viewModel.rangeSelections.value.orEmpty())
+        var selectedRange by mutableStateOf(viewModel.selectedRange.value)
+        var sortSelections by mutableStateOf(viewModel.sortSelections.value.orEmpty())
+        var selectedSorting by mutableStateOf(viewModel.selectedSorting.value)
+        var recommendations by mutableStateOf(viewModel.recommendations.value.orEmpty())
+        var showSyncButton by mutableStateOf(false)
+    }
+
     override fun onBindingCreated(binding: FragmentResultSwipeBinding, savedInstanceState: Bundle?) {
         // Set up sub-binding references
         viewModel = ViewModelProvider(this)[ResultViewModel2::class.java]
         syncModel = ViewModelProvider(this)[SyncViewModel::class.java]
         updateUIEvent += ::updateUI
+
+        val composeState = ComposeStateHolder(viewModel)
 
         resultBinding = binding.fragmentResult
         recommendationBinding = binding.resultRecommendations
@@ -548,10 +637,12 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                 )
 
             observeNullable(viewModel.selectedSorting) {
+                composeState.selectedSorting = it
                 resultSortButton.setText(it)
             }
 
             observe(viewModel.sortSelections) { sort ->
+                composeState.sortSelections = sort
                 resultBinding?.resultSortButton?.setOnClickListener { view ->
                     view?.context?.let { ctx ->
                         val names = sort
@@ -726,6 +817,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }*/
 
         observeNullable(viewModel.resumeWatching) { resume ->
+            composeState.resumeWatching = resume
             resultBinding?.apply {
                 if (resume == null) {
                     resultResumeParent.isVisible = false
@@ -781,6 +873,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observeNullable(viewModel.subscribeStatus) { isSubscribed ->
+            composeState.isSubscribed = isSubscribed
             binding.resultSubscribe.isVisible = isSubscribed != null
             if (isSubscribed == null) return@observeNullable
 
@@ -794,6 +887,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observeNullable(viewModel.favoriteStatus) { isFavorite ->
+            composeState.isFavorite = isFavorite
             binding.resultFavorite.isVisible = isFavorite != null
             if (isFavorite == null) return@observeNullable
 
@@ -807,6 +901,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observeNullable(viewModel.episodes) { episodes ->
+            composeState.episodes = episodes
             resultBinding?.apply {
                 // no failure?
                 resultEpisodeLoading.isVisible = episodes is Resource.Loading
@@ -868,6 +963,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observeNullable(viewModel.movie) { data ->
+             composeState.movie = data
             resultBinding?.apply {
                 resultPlayMovie.isVisible = data is Resource.Success
                 downloadButton.isVisible =
@@ -927,8 +1023,9 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
             }
         }
 
-        observe(viewModel.page) { data ->
-            if (data == null) return@observe
+        observeNullable(viewModel.page) { data ->
+            composeState.page = data
+            if (data == null) return@observeNullable
             resultBinding?.apply {
                 PanelsChildGestureRegionObserver.Provider.get().apply {
                     register(resultCastItems)
@@ -1052,7 +1149,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                     resultErrorText.text = storedData.url.plus("\n") + data.errorString
                 }
 
-                binding.resultBookmarkFab.isVisible = data is Resource.Success
+                binding.resultBookmarkFab.isVisible = data is Resource.Success && !binding.resultComposeView.isVisible
                 resultFinishLoading.isVisible = data is Resource.Success
 
                 resultLoading.isVisible = data is Resource.Loading
@@ -1072,6 +1169,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observeNullable(viewModel.episodesCountText) { count ->
+            composeState.episodesCount = count
             resultBinding?.resultEpisodesText.setText(count)
         }
 
@@ -1100,10 +1198,12 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observe(viewModel.trailers) { trailers ->
+            composeState.trailers = trailers
             setTrailers(trailers.flatMap { it.mirros }) // I don't care about subtitles yet!
         }
 
         observe(syncModel.synced) { list ->
+            composeState.showSyncButton = list.any { it.isSynced && it.hasAccount }
             syncBinding?.resultSyncNames?.text =
                 list.filter { it.isSynced && it.hasAccount }.joinToString { it.name }
 
@@ -1204,9 +1304,10 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                     }
                 }
             }
-            binding.resultOverlappingPanels.setStartPanelLockState(if (closed) OverlappingPanelsLayout.LockState.CLOSE else OverlappingPanelsLayout.LockState.UNLOCKED)
+            binding.resultOverlappingPanels.setStartPanelLockState(if (closed || binding.resultComposeView.isVisible) OverlappingPanelsLayout.LockState.CLOSE else OverlappingPanelsLayout.LockState.UNLOCKED)
         }
         observe(viewModel.recommendations) { recommendations ->
+            composeState.recommendations = recommendations
             setRecommendations(recommendations, null)
         }
         context?.let { ctx ->
@@ -1265,6 +1366,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observe(viewModel.watchStatus) { watchType ->
+            composeState.watchStatus = watchType
             binding.resultBookmarkFab.apply {
                 setText(watchType.stringRes)
                 if (watchType == WatchType.NONE) {
@@ -1327,6 +1429,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observeNullable(viewModel.selectedSeason) { text ->
+            composeState.selectedSeason = text
             resultBinding?.apply {
                 resultSeasonButton.setText(text)
 
@@ -1340,6 +1443,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observeNullable(viewModel.selectedDubStatus) { status ->
+            composeState.selectedDubStatus = status
             resultBinding?.apply {
                 resultDubSelect.setText(status)
 
@@ -1349,6 +1453,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
             }
         }
         observeNullable(viewModel.selectedRange) { range ->
+            composeState.selectedRange = range
             resultBinding?.apply {
                 resultEpisodeSelect.setText(range)
 
@@ -1363,6 +1468,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
 //        val preferDub = context?.getApiDubstatusSettings()?.all { it == DubStatus.Dubbed } == true
 
         observe(viewModel.dubSubSelections) { range ->
+            composeState.dubSubSelections = range
             resultBinding?.resultDubSelect?.setOnClickListener { view ->
                 view?.context?.let { ctx ->
                     view.popupMenuNoIconsAndNoStringRes(
@@ -1380,6 +1486,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observe(viewModel.rangeSelections) { range ->
+            composeState.rangeSelections = range
             resultBinding?.resultEpisodeSelect?.setOnClickListener { view ->
                 view?.context?.let { ctx ->
                     val names = range
@@ -1400,6 +1507,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         }
 
         observe(viewModel.seasonSelections) { seasonList ->
+            composeState.seasonSelections = seasonList
             resultBinding?.resultSeasonButton?.setOnClickListener { view ->
 
                 view?.context?.let { ctx ->
@@ -1426,6 +1534,322 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                 }
             }
         }
+
+        setupComposeDetails(binding, storedData, api, composeState)
+    }
+
+    private fun setupComposeDetails(
+        binding: FragmentResultSwipeBinding,
+        storedData: ResultFragment.StoredData,
+        api: com.lagradost.cloudstream3.MainAPI?,
+        composeState: ComposeStateHolder
+    ) {
+        binding.resultTopBar.isGone = true
+        binding.fragmentResult.root.isGone = true
+        binding.resultBookmarkFab.isGone = true
+        binding.resultComposeView.isVisible = true
+        binding.resultComposeView.setViewCompositionStrategy(
+            ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+        )
+
+        binding.resultOverlappingPanels.setEndPanelLockState(OverlappingPanelsLayout.LockState.CLOSE)
+        binding.resultOverlappingPanels.setStartPanelLockState(OverlappingPanelsLayout.LockState.CLOSE)
+
+        updateComposeGestureRegions()
+        binding.resultComposeView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            updateComposeGestureRegions()
+        }
+
+        binding.resultOverlappingPanels.registerStartPanelStateListeners(
+            object : OverlappingPanelsLayout.PanelStateListener {
+                override fun onPanelStateChange(panelState: PanelState) {
+                    if (panelState == PanelState.Closed && binding.resultComposeView.isVisible) {
+                        binding.resultOverlappingPanels.setStartPanelLockState(OverlappingPanelsLayout.LockState.CLOSE)
+                    }
+                }
+            }
+        )
+
+        val prefs = context?.let { PreferenceManager.getDefaultSharedPreferences(it) }
+        val showCastSetting = prefs?.getBoolean(
+            context?.getString(R.string.show_cast_in_details_key) ?: "show_cast_in_details",
+            true
+        ) ?: true
+        val trailersEnabledSetting = prefs?.getBoolean(
+            context?.getString(R.string.show_trailers_key) ?: "show_trailers_key",
+            true
+        ) ?: LoadResponse.isTrailersEnabled
+
+        binding.resultComposeView.setContent {
+            LiquidGlassTheme {
+                DetailsScreen(
+                    pageResource = composeState.page,
+                    episodesResource = composeState.episodes,
+                    movieResource = composeState.movie,
+                    episodesCountText = composeState.episodesCount,
+                    resumeWatching = composeState.resumeWatching,
+                    trailers = composeState.trailers,
+                    trailersEnabled = trailersEnabledSetting && LoadResponse.isTrailersEnabled,
+                    showCastSetting = showCastSetting,
+                    watchStatus = composeState.watchStatus,
+                    isFavorite = composeState.isFavorite,
+                    isSubscribed = composeState.isSubscribed,
+                    hasDownloadSupport = api?.hasDownloadSupport == true || viewModel.currentRepo?.api?.hasDownloadSupport == true,
+                    showSyncButton = composeState.showSyncButton,
+                    seasonSelections = composeState.seasonSelections,
+                    selectedSeason = composeState.selectedSeason,
+                    dubSubSelections = composeState.dubSubSelections,
+                    selectedDubStatus = composeState.selectedDubStatus,
+                    rangeSelections = composeState.rangeSelections,
+                    selectedRange = composeState.selectedRange,
+                    sortSelectionsCount = composeState.sortSelections.size,
+                    selectedSorting = composeState.selectedSorting,
+                    recommendations = composeState.recommendations,
+                    onBackClick = {
+                        activity?.popCurrentPage()
+                    },
+                    onTitleLongClick = { title ->
+                        clipboardHelper(txt(R.string.title), title)
+                    },
+                    onSyncClick = {
+                        if (binding.resultOverlappingPanels.getSelectedPanel().ordinal == 1) {
+                            binding.resultOverlappingPanels.setStartPanelLockState(OverlappingPanelsLayout.LockState.UNLOCKED)
+                            binding.resultOverlappingPanels.openStartPanel()
+                        } else {
+                            binding.resultOverlappingPanels.closePanels()
+                        }
+                    },
+                    onQuickSearchClick = { query ->
+                        QuickSearchFragment.pushSearch(activity, query)
+                    },
+                    onShareClick = { d ->
+                        try {
+                            val i = Intent(Intent.ACTION_SEND)
+                            val nameBase64 = base64Encode(d.apiName.toString().toByteArray(Charsets.UTF_8))
+                            val urlBase64 = base64Encode(d.url.toByteArray(Charsets.UTF_8))
+                            val encodedUri = URLEncoder.encode(
+                                "$APP_STRING_SHARE:$nameBase64?$urlBase64",
+                                "UTF-8"
+                            )
+                            val redirectUrl = "https://recloudstream.github.io/csredirect?redirectto=$encodedUri"
+                            i.type = "text/plain"
+                            i.putExtra(Intent.EXTRA_SUBJECT, d.title)
+                            i.putExtra(Intent.EXTRA_TEXT, redirectUrl)
+                            startActivity(Intent.createChooser(i, d.title))
+                        } catch (e: Exception) {
+                            logError(e)
+                        }
+                    },
+                    onOpenInBrowserClick = {
+                        val url = (composeState.page as? Resource.Success<ResultData>)?.value?.url ?: storedData.url
+                        if (url.startsWith("http")) {
+                            context?.openBrowser(url)
+                        }
+                    },
+                    onReloadClick = {
+                        viewModel.load(
+                            activity,
+                            storedData.url,
+                            storedData.apiName,
+                            storedData.showFillers,
+                            storedData.dubStatus,
+                            storedData.start
+                        )
+                    },
+                    onPrimaryPlayClick = {
+                        val resume = composeState.resumeWatching
+                        val movieEp = (composeState.movie as? Resource.Success<Pair<com.lagradost.cloudstream3.utils.UiText, ResultEpisode>>)?.value?.second
+                        val firstEp = (composeState.episodes as? Resource.Success<List<ResultEpisode>>)?.value?.firstOrNull()
+                        when {
+                            resume != null -> resumeAction(storedData, resume)
+                            movieEp != null -> viewModel.handleAction(
+                                EpisodeClickEvent(ACTION_CLICK_DEFAULT, movieEp)
+                            )
+                            firstEp != null -> viewModel.handleAction(
+                                EpisodeClickEvent(ACTION_CLICK_DEFAULT, firstEp)
+                            )
+                        }
+                    },
+                    onPrimaryPlayLongClick = {
+                        val resume = composeState.resumeWatching
+                        val movieEp = (composeState.movie as? Resource.Success<Pair<com.lagradost.cloudstream3.utils.UiText, ResultEpisode>>)?.value?.second
+                        val firstEp = (composeState.episodes as? Resource.Success<List<ResultEpisode>>)?.value?.firstOrNull()
+                        val targetEp = resume?.result ?: movieEp ?: firstEp
+                        if (targetEp != null) {
+                            viewModel.handleAction(EpisodeClickEvent(ACTION_SHOW_OPTIONS, targetEp))
+                        }
+                    },
+                    onBookmarkClick = {
+                        val ctx = context ?: return@DetailsScreen
+                        activity?.showBottomDialog(
+                            WatchType.entries.map { ctx.getString(it.stringRes) }.toList(),
+                            composeState.watchStatus.ordinal,
+                            ctx.getString(R.string.action_add_to_bookmarks),
+                            showApply = false,
+                            {}
+                        ) { idx ->
+                            viewModel.updateWatchStatus(WatchType.entries[idx], ctx)
+                        }
+                    },
+                    onFavoriteClick = {
+                        binding.resultFavorite.performClick()
+                    },
+                    onSubscribeClick = {
+                        binding.resultSubscribe.performClick()
+                    },
+                    onMovieDownloadClick = { movieEp ->
+                        context?.let { openBatteryOptimizationSettings(it) }
+                        requirePathForActions(listOf(ACTION_DOWNLOAD_EPISODE to movieEp))
+                    },
+                    onMovieDownloadLongClick = { movieEp ->
+                        context?.let { openBatteryOptimizationSettings(it) }
+                        requirePathForActions(listOf(ACTION_DOWNLOAD_MIRROR to movieEp))
+                    },
+                    onSeasonSelected = { seasonNum ->
+                        viewModel.changeSeason(seasonNum)
+                    },
+                    onDubSelected = { dubStatus ->
+                        viewModel.changeDubStatus(dubStatus)
+                    },
+                    onRangeSelected = { range ->
+                        viewModel.changeRange(range)
+                    },
+                    onSortClick = {
+                        val ctx = context ?: return@DetailsScreen
+                        val sort = viewModel.sortSelections.value ?: return@DetailsScreen
+                        val names = sort.mapNotNull { (text, r) ->
+                            r to (text.asStringNull(ctx) ?: return@mapNotNull null)
+                        }
+                        if (names.isNotEmpty()) {
+                            activity?.showDialog(
+                                names.map { it.second },
+                                viewModel.selectedSortingIndex.value ?: -1,
+                                ctx.getString(R.string.sort_by),
+                                false,
+                                {}
+                            ) { itemId ->
+                                viewModel.setSort(names[itemId].first)
+                            }
+                        }
+                    },
+                    onBatchDownloadClick = { episodesList ->
+                        val ctx = context ?: return@DetailsScreen
+                        val episodeStart = episodesList.firstOrNull()?.episode ?: return@DetailsScreen
+                        val episodeEnd = episodesList.lastOrNull()?.episode ?: return@DetailsScreen
+                        val episodeRange = if (episodeStart == episodeEnd) {
+                            episodeStart.toString()
+                        } else {
+                            txt(R.string.episodes_range, episodeStart, episodeEnd).asString(ctx)
+                        }
+                        val rangeMessage = txt(R.string.download_episode_range, episodeRange).asString(ctx)
+                        AlertDialog.Builder(ctx, R.style.AlertDialogCustom)
+                            .setTitle(R.string.download_all)
+                            .setMessage(rangeMessage)
+                            .setPositiveButton(R.string.yes) { _, _ ->
+                                requirePathForActions(episodesList.map { ACTION_DOWNLOAD_EPISODE to it })
+                            }
+                            .setNegativeButton(R.string.cancel) { _, _ -> }
+                            .show()
+                    },
+                    onBatchDownloadLongClick = {
+                        ioSafe {
+                            val defaultSources = QualityProfileDialog.getAllDefaultSources()
+                            val act = activity ?: return@ioSafe
+                            act.runOnUiThread {
+                                QualityProfileDialog(
+                                    act,
+                                    R.style.DialogFullscreenPlayer,
+                                    defaultSources,
+                                ).show()
+                            }
+                        }
+                    },
+                    onEpisodeClick = { episode ->
+                        viewModel.handleAction(EpisodeClickEvent(ACTION_CLICK_DEFAULT, episode))
+                    },
+                    onEpisodeLongClick = { episode ->
+                        viewModel.handleAction(EpisodeClickEvent(ACTION_SHOW_OPTIONS, episode))
+                    },
+                    onEpisodeDownloadClick = { episode ->
+                        context?.let { openBatteryOptimizationSettings(it) }
+                        requirePathForActions(listOf(ACTION_DOWNLOAD_EPISODE to episode))
+                    },
+                    onEpisodeDownloadLongClick = { episode ->
+                        context?.let { openBatteryOptimizationSettings(it) }
+                        requirePathForActions(listOf(ACTION_DOWNLOAD_MIRROR to episode))
+                    },
+                    onEpisodeToggleWatched = { episode ->
+                        viewModel.handleAction(EpisodeClickEvent(ACTION_MARK_AS_WATCHED, episode))
+                    },
+                    onActorClick = { actorData ->
+                        QuickSearchFragment.pushSearch(activity, actorData.actor.name)
+                    },
+                    onRecommendationClick = { rec ->
+                        SearchHelper.handleSearchClickCallback(
+                            SearchClickCallback(SEARCH_ACTION_LOAD, binding.resultComposeView, -1, rec)
+                        )
+                    },
+                    onRecommendationLongClick = { rec ->
+                        (activity as? MainActivity)?.loadPopup(rec, load = false)
+                    },
+                    onTrailerClick = { trailer ->
+                        val titleStr = (composeState.page as? Resource.Success<ResultData>)?.value?.let {
+                            it.titleText.asStringNull(context)?.takeIf { s -> s.isNotBlank() } ?: it.title
+                        }.orEmpty()
+                        playTrailerInInternalPlayer(activity, trailer, titleStr)
+                    }
+                )
+            }
+        }
+    }
+
+    private fun playTrailerInInternalPlayer(
+        activity: Activity?,
+        trailer: TrailerMirror,
+        title: String,
+    ) {
+        val act = activity ?: return
+        val dummyEpisode = ResultEpisode(
+            headerName = title,
+            name = trailer.title.ifBlank { "Trailer" },
+            poster = trailer.thumbnailUrl,
+            episode = 0,
+            seasonIndex = null,
+            season = null,
+            data = trailer.link.url,
+            apiName = "Trailer",
+            id = (trailer.link.url.hashCode() and 0x7FFFFFFF),
+            index = 0,
+            position = 0L,
+            duration = 0L,
+            score = null,
+            description = null,
+            isFiller = false,
+            tvType = TvType.Movie,
+            parentId = 0,
+            videoWatchState = VideoWatchState.None,
+        )
+        val generator = object : VideoGenerator<ResultEpisode>(listOf(dummyEpisode)) {
+            override val hasCache: Boolean = false
+            override val canSkipLoading: Boolean = false
+            override fun getId(index: Int): Int = dummyEpisode.id
+
+            override suspend fun generateLinks(
+                clearCache: Boolean,
+                sourceTypes: Set<ExtractorLinkType>,
+                callback: (Pair<ExtractorLink?, ExtractorUri?>) -> Unit,
+                subtitleCallback: (SubtitleData) -> Unit,
+                offset: Int,
+                isCasting: Boolean
+            ): Boolean {
+                callback(trailer.link to null)
+                return true
+            }
+        }
+        act.navigate(
+            R.id.global_to_navigation_player,
+            GeneratorPlayer.newInstance(generator, 0)
+        )
     }
 
     private fun resumeAction(
@@ -1443,8 +1867,10 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
     override fun onPause() {
         playerHostView?.releaseKeyEventListener()
         super.onPause()
-        PanelsChildGestureRegionObserver.Provider.get()
-            .addGestureRegionsUpdateListener(gestureRegionsListener)
+        PanelsChildGestureRegionObserver.Provider.get().let { obs ->
+            obs.removeGestureRegionsUpdateListener(gestureRegionsListener)
+            binding?.resultComposeView?.let { obs.unregister(it) }
+        }
     }
 
     private fun setRecommendations(rec: List<SearchResponse>?, validApiName: String?) {
@@ -1477,7 +1903,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                     resultShare.nextFocusDownId = nextFocusDown
                 }
             }
-            resultOverlappingPanels.setEndPanelLockState(if (isInvalid) OverlappingPanelsLayout.LockState.CLOSE else OverlappingPanelsLayout.LockState.UNLOCKED)
+            resultOverlappingPanels.setEndPanelLockState(if (isInvalid || resultComposeView.isVisible) OverlappingPanelsLayout.LockState.CLOSE else OverlappingPanelsLayout.LockState.UNLOCKED)
 
             rec?.map { it.apiName }?.distinct()?.let { apiNames ->
                 // very dirty selection

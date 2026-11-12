@@ -1,18 +1,34 @@
 package com.mihon.presentation.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
+import com.lagradost.cloudstream4.compose.WhiteIconButton
+import com.mihon.material.UpIcon
+import com.mihon.presentation.settings.widget.GroupPosition
+import com.mihon.presentation.settings.widget.LocalGroupPosition
 import com.mihon.presentation.settings.widget.PreferenceGroupHeader
+import com.mihon.presentation.settings.widget.getGroupPosition
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,6 +42,8 @@ fun PreferenceScreen(
     items: List<Preference>,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    onBackPressed: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     val state = rememberLazyListState()
     val highlightKey = SearchableSettings.highlightKey
@@ -34,7 +52,7 @@ fun PreferenceScreen(
             val i = items.findHighlightedIndex(highlightKey)
             if (i >= 0) {
                 delay(0.5.seconds)
-                state.animateScrollToItem(i)
+                state.animateScrollToItem(i + if (onBackPressed != null) 1 else 0)
             }
             SearchableSettings.highlightKey = null
         }
@@ -45,6 +63,29 @@ fun PreferenceScreen(
         state = state,
         contentPadding = contentPadding,
     ) {
+        if (onBackPressed != null) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    WhiteIconButton(
+                        onClick = onBackPressed,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.10f)),
+                    ) {
+                        UpIcon(navigationIcon = null)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    actions()
+                }
+            }
+        }
+
         items.fastForEachIndexed { i, preference ->
             when (preference) {
                 // Create Preference Group
@@ -56,27 +97,36 @@ fun PreferenceScreen(
                             PreferenceGroupHeader(title = preference.title)
                         }
                     }
-                    items(preference.preferenceItems) { item ->
-                        PreferenceItem(
-                            item = item,
-                            highlightKey = highlightKey,
-                        )
+                    val total = preference.preferenceItems.size
+                    itemsIndexed(preference.preferenceItems) { index, item ->
+                        val position = getGroupPosition(index, total)
+                        CompositionLocalProvider(LocalGroupPosition provides position) {
+                            PreferenceItem(
+                                item = item,
+                                highlightKey = highlightKey,
+                            )
+                        }
                     }
                     item {
                         if (i < items.lastIndex) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
                 }
 
                 // Create Preference Item
                 is Preference.PreferenceItem<*, *> -> item {
-                    PreferenceItem(
-                        item = preference,
-                        highlightKey = highlightKey,
-                    )
+                    CompositionLocalProvider(LocalGroupPosition provides GroupPosition.Single) {
+                        PreferenceItem(
+                            item = preference,
+                            highlightKey = highlightKey,
+                        )
+                    }
                 }
             }
+        }
+        item {
+            Spacer(modifier = Modifier.height(96.dp))
         }
     }
 }

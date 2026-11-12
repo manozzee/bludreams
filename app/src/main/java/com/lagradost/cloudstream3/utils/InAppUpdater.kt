@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.utils
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager.NameNotFoundException
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -24,7 +23,6 @@ import com.lagradost.cloudstream3.services.PackageInstallerService
 import com.lagradost.cloudstream3.utils.AppContextUtils.setDefaultFocus
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
-import com.lagradost.cloudstream3.utils.GitInfo.currentCommitHash
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -38,10 +36,9 @@ import java.io.IOException
 import java.io.InputStreamReader
 
 object InAppUpdater {
-    private const val GITHUB_USER_NAME = "recloudstream"
-    private const val GITHUB_REPO = "cloudstream"
+    private const val GITHUB_USER_NAME = "manozzee"
+    private const val GITHUB_REPO = "bludreams"
 
-    private const val PRERELEASE_PACKAGE_NAME = "com.lagradost.cloudstream3.prerelease"
     private const val LOG_TAG = "InAppUpdater"
 
     @Serializable
@@ -63,18 +60,6 @@ object InAppUpdater {
     )
 
     @Serializable
-    private data class GithubObject(
-        @JsonProperty("sha") @SerialName("sha") val sha: String, // SHA-256 hash
-        @JsonProperty("type") @SerialName("type") val type: String,
-        @JsonProperty("url") @SerialName("url") val url: String,
-    )
-
-    @Serializable
-    private data class GithubTag(
-        @JsonProperty("object") @SerialName("object") val githubObject: GithubObject,
-    )
-
-    @Serializable
     private data class Update(
         @JsonProperty("shouldUpdate") @SerialName("shouldUpdate") val shouldUpdate: Boolean,
         @JsonProperty("updateURL") @SerialName("updateURL") val updateURL: String?,
@@ -83,12 +68,11 @@ object InAppUpdater {
         @JsonProperty("updateNodeId") @SerialName("updateNodeId") val updateNodeId: String?,
     )
 
-    private suspend fun Activity.getAppUpdate(installPrerelease: Boolean): Update {
+    private suspend fun Activity.getAppUpdate(): Update {
         return try {
             when {
                 // No updates on debug version
                 BuildConfig.DEBUG -> Update(false, null, null, null, null)
-                BuildConfig.FLAVOR == "prerelease" || installPrerelease -> getPreReleaseUpdate()
                 else -> getReleaseUpdate()
             }
         } catch (e: Exception) {
@@ -150,46 +134,12 @@ object InAppUpdater {
         )
     }
 
-    private suspend fun Activity.getPreReleaseUpdate(): Update {
-        val tagUrl =
-            "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/git/ref/tags/pre-release"
-        val releaseUrl = "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/releases"
-        val headers = mapOf("Accept" to "application/vnd.github.v3+json")
-        val response = parseJson<Array<GithubRelease>>(
-            app.get(releaseUrl, headers = headers).text
-        ).toList()
-
-        val found = response.lastOrNull { rel ->
-            rel.prerelease || rel.tagName == "pre-release"
-        }
-
-        val foundAsset = found?.assets?.filter { it ->
-            it.contentType == "application/vnd.android.package-archive"
-        }?.getOrNull(0)
-
-        if (foundAsset == null) {
-            return Update(false, null, null, null, null)
-        }
-
-        val tagResponse = parseJson<GithubTag>(app.get(tagUrl, headers = headers).text)
-        val updateCommitHash = tagResponse.githubObject.sha.trim().take(7)
-        Log.d(LOG_TAG, "Fetched GitHub tag: $updateCommitHash")
-
-        return Update(
-            currentCommitHash() != updateCommitHash,
-            foundAsset.browserDownloadUrl,
-            updateCommitHash,
-            found.body,
-            found.nodeId
-        )
-    }
-
     private val updateLock = Mutex()
 
     private suspend fun Activity.downloadUpdate(url: String): Boolean {
         try {
             Log.d(LOG_TAG, "Downloading update: $url")
-            val appUpdateName = "CloudStream"
+            val appUpdateName = "BluDreams"
             val appUpdateSuffix = "apk"
 
             // Delete all old updates
@@ -227,28 +177,11 @@ object InAppUpdater {
         context.startActivity(installIntent)
     }
 
-    fun Activity.installPreReleaseIfNeeded() = ioSafe {
-        val isInstalled = try {
-            packageManager.getPackageInfo(PRERELEASE_PACKAGE_NAME, 0)
-            true
-        } catch (_: NameNotFoundException) {
-            false
-        }
-
-        if (isInstalled) {
-            showToast(R.string.prerelease_already_installed)
-        } else if (!runAutoUpdate(checkAutoUpdate = false, installPrerelease = true)) {
-            showToast(R.string.prerelease_install_failed)
-        }
-    }
-
-
     /**
      * @param checkAutoUpdate if the update check was launched automatically
-     * @param installPrerelease if we want to install the pre-release version
      */
     suspend fun Activity.runAutoUpdate(
-        checkAutoUpdate: Boolean = true, installPrerelease: Boolean = false
+        checkAutoUpdate: Boolean = true
     ): Boolean {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val autoUpdateEnabled =
@@ -257,7 +190,7 @@ object InAppUpdater {
             return false
         }
 
-        val update = getAppUpdate(installPrerelease)
+        val update = getAppUpdate()
         if (!update.shouldUpdate || update.updateURL == null) {
             return false
         }

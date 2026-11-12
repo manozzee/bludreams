@@ -14,7 +14,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/background_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -23,6 +23,8 @@
             android:elevation="10dp"
             app:cardBackgroundColor="?attr/primaryGrayBackground"
             app:cardCornerRadius="@dimen/rounded_image_radius"
+            app:strokeWidth="1dp"
+            app:strokeColor="#14FFFFFF"
             app:layout_constraintDimensionRatio="1:1.5"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -34,7 +36,7 @@
                 android:layout_height="match_parent"
                 android:contentDescription="@string/search_poster_img_des"
                 android:duplicateParentState="true"
-                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:scaleType="centerCrop"
                 tools:src="@drawable/example_poster" />
 
@@ -110,7 +112,7 @@
                     style="@style/EpisodeTextButton"
                     android:layout_gravity="center"/>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <TextView
@@ -127,7 +129,7 @@
         android:paddingEnd="5dp"
         android:paddingBottom="5dp"
         android:textColor="?attr/textColor"
-        android:textSize="13sp"
+        android:textSize="11.5sp"
         tools:text="The Perfect Run\nThe Perfect Run" />
 
 </LinearLayout>

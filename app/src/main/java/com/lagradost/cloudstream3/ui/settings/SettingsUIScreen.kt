@@ -9,6 +9,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.fragment.app.FragmentActivity
+import com.lagradost.cloudstream3.ui.poster.PosterCardStyleRepository
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.integerArrayResource
@@ -16,14 +22,20 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.CommonActivity
 import com.lagradost.cloudstream3.CommonActivity.activity
-import com.lagradost.cloudstream3.DubStatus
 import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.SearchQuality
 import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.ui.clear
 import com.lagradost.cloudstream3.ui.home.HomeChildItemAdapter
+import com.lagradost.cloudstream3.APIHolder
+import com.lagradost.cloudstream3.ui.APIRepository.Companion.noneApi
+import com.lagradost.cloudstream3.ui.APIRepository.Companion.randomApi
+import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
+import com.lagradost.cloudstream3.ui.home.HomeFragment
+import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.ui.home.ParentItemAdapter
 import com.lagradost.cloudstream3.ui.search.SearchAdapter
 import com.lagradost.cloudstream3.ui.settings.Globals.updateTv
@@ -41,28 +53,28 @@ import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
 
+fun SearchQuality.toStringRes(): Int = when (this) {
+    SearchQuality.BlueRay -> R.string.quality_blueray
+    SearchQuality.Cam -> R.string.quality_cam
+    SearchQuality.CamRip -> R.string.quality_cam_rip
+    SearchQuality.DVD -> R.string.quality_dvd
+    SearchQuality.HD -> R.string.quality_hd
+    SearchQuality.HQ -> R.string.quality_hq
+    SearchQuality.HdCam -> R.string.quality_cam_hd
+    SearchQuality.Telecine -> R.string.quality_tc
+    SearchQuality.Telesync -> R.string.quality_ts
+    SearchQuality.WorkPrint -> R.string.quality_workprint
+    SearchQuality.SD -> R.string.quality_sd
+    SearchQuality.FourK -> R.string.quality_4k
+    SearchQuality.UHD -> R.string.quality_uhd
+    SearchQuality.SDR -> R.string.quality_sdr
+    SearchQuality.HDR -> R.string.quality_hdr
+    SearchQuality.WebRip -> R.string.quality_webrip
+}
+
 object SettingsUIScreen : SearchableSettings {
     @Composable
     override fun getTitleRes(): String = stringResource(R.string.category_ui)
-
-    fun SearchQuality.toStringRes() = when (this) {
-        SearchQuality.BlueRay -> R.string.quality_blueray
-        SearchQuality.Cam -> R.string.quality_cam
-        SearchQuality.CamRip -> R.string.quality_cam_rip
-        SearchQuality.DVD -> R.string.quality_dvd
-        SearchQuality.HD -> R.string.quality_hd
-        SearchQuality.HQ -> R.string.quality_hq
-        SearchQuality.HdCam -> R.string.quality_cam_hd
-        SearchQuality.Telecine -> R.string.quality_tc
-        SearchQuality.Telesync -> R.string.quality_ts
-        SearchQuality.WorkPrint -> R.string.quality_workprint
-        SearchQuality.SD -> R.string.quality_sd
-        SearchQuality.FourK -> R.string.quality_4k
-        SearchQuality.UHD -> R.string.quality_uhd
-        SearchQuality.SDR -> R.string.quality_sdr
-        SearchQuality.HDR -> R.string.quality_hdr
-        SearchQuality.WebRip -> R.string.quality_webrip
-    }
 
     @Composable
     fun RoundColor(color: Color) {
@@ -78,6 +90,11 @@ object SettingsUIScreen : SearchableSettings {
     @Composable
     override fun getPreferences(): List<Preference> {
         val settings = rememberAppSettings()
+        val context = LocalContext.current
+        val posterStyle by remember(context) {
+            PosterCardStyleRepository.ensureLoaded(context)
+            PosterCardStyleRepository.state
+        }.collectAsState()
 
         return persistentListOf(
             Preference.PreferenceGroup(
@@ -106,30 +123,18 @@ object SettingsUIScreen : SearchableSettings {
                             }
                             return@ListPreference false
                         }),
-                    Preference.PreferenceItem.ListPreference(
-                        preference = settings.ui.theme,
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = settings.ui.pureBlack,
                         icon = painterResource(R.drawable.palette_24px),
-                        title = stringResource(R.string.app_theme_settings),
-                        entries = stringArrayResource(R.array.themes_names_values).zip(
-                            stringArrayResource(R.array.themes_names)
-                        ).toMap().toPersistentMap().mutate { map ->
-                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) { // remove monet on android 11 and less
-                                map.remove("Monet")
-                            }
-                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) { // Remove system on android 9 and less
-                                map.remove("System")
-                            }
-                        },
-                        iconProvider = { k, _ ->
-                            val theme = modeToTheme(perfToMode(k), CloudStreamPrimaryColor.NORMAL)
-                            RoundColor(theme.background)
-                        },
+                        title = stringResource(R.string.pure_black_settings),
+                        subtitle = stringResource(R.string.pure_black_settings_des),
                         onValueChanged = { newValue ->
-                            settings.ui.theme.set(newValue) // We need to set before we recreate
-                            safe {
-                                activity?.recreate()
+                            settings.ui.pureBlack.set(newValue)
+                            activity?.let { act ->
+                                CommonActivity.loadThemes(act)
+                                act.recreate()
                             }
-                            return@ListPreference false
+                            true
                         }),
                     Preference.PreferenceItem.ListPreference(
                         preference = settings.ui.layout,
@@ -146,6 +151,22 @@ object SettingsUIScreen : SearchableSettings {
                             }
                             return@ListPreference false
                         }),
+                    Preference.PreferenceItem.TextPreference(
+                        title = "Poster Card Style",
+                        subtitle = buildString {
+                            append("${posterStyle.widthDp.toInt()}dp · ${posterStyle.cornerRadiusDp.toInt()}dp radius")
+                            if (posterStyle.landscapePostersEnabled) append(" · Landscape")
+                            if (posterStyle.hideLabels) append(" · No labels")
+                        },
+                        icon = painterResource(R.drawable.baseline_grid_view_24),
+                        onClick = {
+                            val fragActivity = activity as? FragmentActivity
+                            if (fragActivity != null) {
+                                PosterCustomizationSettingsDialogFragment.newInstance()
+                                    .show(fragActivity.supportFragmentManager, "poster_customization_settings")
+                            }
+                        }
+                    ),
                 )
             ),
 
@@ -212,11 +233,29 @@ object SettingsUIScreen : SearchableSettings {
                         icon = painterResource(R.drawable.ic_baseline_clock_24),
                         enabled = isLayout(TV),
                     ),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.randomButtonEnabled,
-                        title = stringResource(R.string.random_button_settings),
-                        subtitle = stringResource(R.string.random_button_settings_desc),
-                        icon = painterResource(R.drawable.shuffle_24px)
+                    Preference.PreferenceItem.TextPreference(
+                        icon = painterResource(R.drawable.filter_alt_24px),
+                        title = stringResource(R.string.home_page_source_title),
+                        subtitle = DataStoreHelper.currentHomePage ?: stringResource(R.string.none),
+                        onClick = {
+                            activity?.let { ctx ->
+                                val apis = APIHolder.apis.map { it.name }.toMutableList()
+                                apis.add(0, randomApi.name)
+                                apis.add(0, noneApi.name)
+                                val current = DataStoreHelper.currentHomePage
+                                ctx.showBottomDialog(
+                                    apis,
+                                    apis.indexOf(current),
+                                    ctx.getString(R.string.home_page_source_title),
+                                    true,
+                                    {},
+                                ) { index ->
+                                    val selected = apis.getOrNull(index) ?: return@showBottomDialog
+                                    DataStoreHelper.currentHomePage = selected
+                                    ctx.recreate()
+                                }
+                            }
+                        }
                     ),
                     Preference.PreferenceItem.ListPreference(
                         preference = settings.ui.confirmExit,
@@ -226,75 +265,6 @@ object SettingsUIScreen : SearchableSettings {
                         entries = integerArrayResource(R.array.confirm_exit_values).zip(
                             stringArrayResource(R.array.confirm_exit)
                         ).toMap()
-                    ),
-                )
-            ),
-
-            Preference.PreferenceGroup(
-                title = stringResource(R.string.search_poster_img_des),
-                preferenceItems = persistentListOf(
-                    Preference.PreferenceItem.MultiSelectListPreference(
-                        preference = settings.ui.filterQuality,
-                        title = stringResource(R.string.pref_filter_search_quality),
-                        icon = painterResource(R.drawable.filter_alt_24px),
-                        entries = SearchQuality.entries.associateWith { stringResource(it.toStringRes()) }),
-                    Preference.PreferenceItem.MultiSelectListPreference(
-                        title = stringResource(R.string.display_subbed_dubbed_settings),
-                        icon = painterResource(R.drawable.audio_capture_24px),
-                        preference = settings.provider.displayDubSub,
-                        entries = mapOf(
-                            DubStatus.None.name to stringResource(R.string.none),
-                            DubStatus.Dubbed.name to stringResource(R.string.app_dubbed_text),
-                            DubStatus.Subbed.name to stringResource(R.string.app_subbed_text),
-                        )),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.bottomTitle,
-                        title = stringResource(R.string.bottom_title_settings),
-                        subtitle = stringResource(R.string.bottom_title_settings_des),
-                        icon = painterResource(R.drawable.title_24px)
-                    ),
-                    Preference.PreferenceItem.SliderPreference(
-                        preference = settings.ui.posterSize,
-                        title = stringResource(R.string.poster_size_settings),
-                        subtitle = stringResource(R.string.poster_size_settings_des),
-                        valueRange = 0..15,
-                        icon = painterResource(R.drawable.baseline_grid_view_24),
-                        onValueChanged = { newValue ->
-                            HomeChildItemAdapter.sharedPool.clear()
-                            ParentItemAdapter.sharedPool.clear()
-                            SearchAdapter.sharedPool.clear()
-                            activity?.let { HomeChildItemAdapter.updatePosterSize(it, newValue) }
-                            settings.ui.posterSize.set(newValue)
-                            return@SliderPreference false
-                        }),
-                ),
-            ),
-            Preference.PreferenceGroup(
-                title = stringResource(R.string.poster_ui_settings),
-                preferenceItems = persistentListOf(
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.posterShowRating,
-                        title = stringResource(R.string.show_rating),
-                    ),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.posterShowEpisode,
-                        title = stringResource(R.string.show_episode_text),
-                    ),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.posterShowTitle,
-                        title = stringResource(R.string.show_title),
-                    ),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.posterShowHd,
-                        title = stringResource(R.string.show_hd),
-                    ),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.posterShowDub,
-                        title = stringResource(R.string.show_dub),
-                    ),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.ui.posterShowSub,
-                        title = stringResource(R.string.show_sub),
                     ),
                 )
             )

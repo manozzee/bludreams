@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-import android.os.Build
 import android.text.format.Formatter.formatShortFileSize
 import android.view.View
 import android.widget.LinearLayout
@@ -14,6 +13,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.stringResource
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.widget.doOnTextChanged
@@ -30,6 +33,10 @@ import com.lagradost.cloudstream3.mvvm.observeNullable
 import com.lagradost.cloudstream3.ui.BaseFragment
 import com.lagradost.cloudstream3.ui.download.DownloadButtonSetup.handleDownloadClick
 import com.lagradost.cloudstream3.ui.download.queue.DownloadQueueViewModel
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassDownloadsToolbar
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import com.lagradost.cloudstream3.utils.GroupCardHelper
+import com.lagradost.cloudstream3.utils.GroupPosition
 import com.lagradost.cloudstream3.ui.player.BasicLink
 import com.lagradost.cloudstream3.ui.player.GeneratorPlayer
 import com.lagradost.cloudstream3.ui.player.LinkGenerator
@@ -61,6 +68,8 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
     private val downloadViewModel: DownloadViewModel by activityViewModels()
     private val downloadQueueViewModel: DownloadQueueViewModel by activityViewModels()
 
+    private val queueLabelState = mutableStateOf<String?>(null)
+
     private fun View.setLayoutWidth(weight: Long) {
         val param = LinearLayout.LayoutParams(
             0,
@@ -87,6 +96,33 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
         hideKeyboard()
         binding.downloadAppbar.setAppBarNoScrollFlagsOnTV()
         binding.downloadDeleteAppbar.setAppBarNoScrollFlagsOnTV()
+        GroupCardHelper.applyGroupCardStyle(
+            binding.downloadStorageAppbar,
+            GroupPosition.Single,
+            horizontalMarginDp = 16f
+        )
+
+        binding.downloadToolbarComposeView.apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                LiquidGlassTheme {
+                    val queueLabel by queueLabelState
+
+                    LiquidGlassDownloadsToolbar(
+                        title = stringResource(R.string.title_downloads),
+                        queueLabel = queueLabel,
+                        showPlay = !isLayout(TV),
+                        onPlay = { openLocalVideo() },
+                        onStream = {
+                            context?.let { ctx -> showStreamInputDialog(ctx) }
+                        },
+                        onQueue = {
+                            activity?.navigate(R.id.action_navigation_global_to_navigation_download_queue)
+                        }
+                    )
+                }
+            }
+        }
 
         observe(downloadViewModel.headerCards) { cards ->
             when (cards) {
@@ -152,6 +188,11 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
                 "$baseText (${cards.currentDownloads.size}/$size)"
             } else {
                 baseText
+            }
+            queueLabelState.value = if (size > 0) {
+                "${cards.currentDownloads.size}/$size"
+            } else {
+                null
             }
         }
 
@@ -226,7 +267,6 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
             setLinearListLayout(
                 isHorizontal = false,
                 nextRight = FOCUS_SELF,
-                nextDown = R.id.download_queue_button,
             )
         }
 
@@ -249,12 +289,6 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
 
             downloadStreamButtonTv.setOnClickListener { showStreamInputDialog(it.context) }
             steamImageviewHolder.isVisible = isLayout(TV)
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            binding.downloadList.setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
-                handleScroll(scrollY - oldScrollY)
-            }
         }
 
         context?.let { downloadViewModel.updateHeaderList(it) }
@@ -366,14 +400,6 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
         binding.hlsSwitch.isChecked = safe {
             URI(text).path?.substringAfterLast(".")?.contains("m3u")
         } == true
-    }
-
-    private fun handleScroll(dy: Int) {
-        if (dy > 0) {
-            binding?.downloadStreamButton?.shrink()
-        } else if (dy < -5) {
-            binding?.downloadStreamButton?.extend()
-        }
     }
 
     // Open local video from files using content provider x safeFile

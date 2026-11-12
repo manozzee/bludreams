@@ -3,28 +3,15 @@ package com.lagradost.cloudstream4.theme
 import androidx.compose.ui.graphics.Color
 
 enum class CloudStreamPrimaryColor(val color: Color) {
-    NORMAL(Color(0xFF3D50FA)),
-    BLUE(Color(0xFF5664B7)),
-    PURPLE(Color(0xFF6200EA)),
-    GREEN(Color(0xFF00BFA5)),
-    GREEN_APPLE(Color(0xFF48E484)),
-    RED(Color(0xFFD50000)),
-    BANANA(Color(0xFFE4D448)),
-    PARTY(Color(0xFFEA596E)),
-    PINK(Color(0xFFFF1493)),
-    CARNATION_PINK(Color(0xFFBD5DA5)),
-    MAROON(Color(0xFF451010)),
-    DARK_GREEN(Color(0xFF004500)),
-    NAVY_BLUE(Color(0xFF000080)),
-    GREY(Color(0xFF515151)),
-    WHITE(Color(0xFFFFFFFF)),
-    BROWN(Color(0xFF622C00)),
-    ORANGE(Color(0xFFCE8500)),
-    DANDELION_YELLOW(Color(0xFFF5BB00)),
-    COOL_BLUE(Color(0xFF408CAC)),
-    LAVENDER(Color(0xFF6F55AF)),
-    DYNAMIC(Color(0xFF3D50FA)),
-    DYNAMIC_TWO(Color(0xFF3D50FA)),
+    VELVET_NOIR(Color(0xFF991B1B)),
+    AURA_BRASS(Color(0xFFB98A28)),
+    SMOKED_COGNAC(Color(0xFF9A3412)),
+    OBSIDIAN_PINE(Color(0xFF065F46)),
+    FINCHER_TEAL(Color(0xFF0E7490)),
+    MIDNIGHT_LAPIS(Color(0xFF1E40AF)),
+    NOCTURNE_VIOLET(Color(0xFF581C87)),
+    DYNAMIC(Color(0xFF991B1B)),
+    DYNAMIC_TWO(Color(0xFF991B1B)),
 }
 
 
@@ -34,16 +21,19 @@ internal object CloudStreamPalette {
     val PrimaryDark = Color(0xFF3700B3)
     val Ongoing = Color(0xFFF53B66)
 
-    val DarkPrimaryGrayBg = Color(0xFF2B2C30)
-    val DarkBlackBg = Color(0xFF111111)
-    val DarkIconGrayBg = Color(0xFF1C1C20)
-    val DarkBoxItemBg = Color(0xFF161616)
+    // Default luxury dark charcoal / slate profile (AMOLED Off)
+    val DarkPrimaryGrayBg = Color(0xFF202227) // Elevated cards
+    val DarkBlackBg = Color(0xFF131417)        // Root window / canvas
+    val DarkIconGrayBg = Color(0xFF26282E)     // Elevated dialogs / surfaces
+    val DarkBoxItemBg = Color(0xFF1B1C21)      // Elevated containers / bottom sheets
     val DarkText = Color(0xFFE9EAEE)
     val DarkGrayText = Color(0xFF9BA0A4)
     val DarkIcon = Color(0xFF9BA0A6)
 
-    // Amoled
+    // Pure Black / AMOLED (AMOLED On)
     val AmoledBlack = Color(0xFF000000)
+    val AmoledElevated = Color(0xFF0F0F12)
+    val AmoledCard = Color(0xFF141418)
     val AmoledNearBlack = Color(0xFF121212)
 
     // Light

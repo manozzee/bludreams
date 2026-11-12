@@ -9,6 +9,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import com.lagradost.cloudstream3.ui.poster.PosterCardStyleRepository
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.content.res.Resources
@@ -207,15 +208,25 @@ object UIHelper {
         listView.requestLayout()
     }
 
-    fun Context.getSpanCount(isHorizontal:Boolean=false): Int {
-//        val compactView = false
-        val spanCountLandscape = if (isHorizontal) 3 else 6
-        val spanCountPortrait = if (isHorizontal) 2 else 3
-        val orientation = resources.configuration.orientation
+    fun Context.getPosterSpanCount(
+        isHorizontal: Boolean = PosterCardStyleRepository.state.value.catalogLandscapeModeEnabled,
+        customWidthDp: Int = PosterCardStyleRepository.state.value.widthDp
+    ): Int {
+        val displayMetrics = resources.displayMetrics
+        val screenWidthDp = (displayMetrics.widthPixels / displayMetrics.density).toInt()
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-        return if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            spanCountLandscape
-        } else spanCountPortrait
+        return if (isHorizontal) {
+            val targetWidth = (customWidthDp * 1.55).toInt().coerceAtLeast(140)
+            (screenWidthDp / targetWidth).coerceIn(if (isLandscape) 3 else 2, 6)
+        } else {
+            (screenWidthDp / customWidthDp.coerceAtLeast(70)).coerceIn(if (isLandscape) 4 else 2, 8)
+        }
+    }
+
+    fun Context.getSpanCount(isHorizontal: Boolean = false): Int {
+        val landscapeMode = isHorizontal || PosterCardStyleRepository.state.value.catalogLandscapeModeEnabled
+        return getPosterSpanCount(landscapeMode)
     }
 
     fun Fragment.hideKeyboard() {
@@ -373,6 +384,10 @@ object UIHelper {
         // edge-to-edge is very buggy on earlier versions
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         WindowCompat.enableEdgeToEdge(window)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
     }
 
     fun Activity.setNavigationBarColorCompat(@AttrRes resourceId: Int) {
@@ -508,9 +523,7 @@ object UIHelper {
     }
 
     fun Context?.isBottomLayout(): Boolean {
-        if (this == null) return true
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
-        return settingsManager.getBoolean(getString(R.string.bottom_title_key), true)
+        return true
     }
 
     fun Activity.changeStatusBarState(hide: Boolean) {

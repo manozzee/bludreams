@@ -8,21 +8,32 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream4.theme.AppFont
 
 @Composable
-fun PreferenceGroupHeader(title: String) {
+fun PreferenceGroupHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
     Box(
         contentAlignment = Alignment.CenterStart,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp, top = 14.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 8.dp),
     ) {
         Text(
             text = title,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = PrefsHorizontalPadding),
-            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontFamily = AppFont.outfit,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                letterSpacing = 0.3.sp,
+            ),
         )
     }
 }

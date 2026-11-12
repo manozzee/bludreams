@@ -82,6 +82,7 @@ class ResultTrailerPlayer : ResultFragmentPhone() {
     }
 
     private fun fixPlayerSize() {
+        if (binding?.resultComposeView?.isVisible == true) return
         binding?.apply {
             if (isFullScreenPlayer) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -175,6 +176,7 @@ class ResultTrailerPlayer : ResultFragmentPhone() {
     }
 
     private fun updateFullscreen(fullscreen: Boolean) {
+        if (binding?.resultComposeView?.isVisible == true) return
         isFullScreenPlayer = fullscreen
         lockRotation = fullscreen
         playerHostView?.isFullScreen = fullscreen
@@ -243,6 +245,7 @@ class ResultTrailerPlayer : ResultFragmentPhone() {
         playerHostView?.requestUpdateBrightnessOverlayOnNextLayout()
 
         playerBinding?.playerFullscreen?.setOnClickListener { updateFullscreen(!isFullScreenPlayer) }
+        if (binding.resultComposeView.isVisible) return
         updateFullscreen(isFullScreenPlayer)
         uiReset()
 

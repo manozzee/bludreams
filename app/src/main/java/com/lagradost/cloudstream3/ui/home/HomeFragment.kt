@@ -22,7 +22,31 @@ import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.activityViewModels
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import com.lagradost.cloudstream3.HomePageList
+import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.MainActivity
+import com.lagradost.cloudstream3.ui.home.LoadClickCallback
+import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
+import com.lagradost.cloudstream3.ui.WatchType
+import com.lagradost.cloudstream3.ui.account.AccountHelper.showAccountEditDialog
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import com.lagradost.cloudstream3.ui.home.HomeScreen
+import com.lagradost.cloudstream3.ui.settings.PosterCustomizationSettingsDialogFragment
+import com.lagradost.cloudstream3.ui.result.ResultViewModel2
+import com.lagradost.cloudstream3.ui.result.START_ACTION_RESUME_LATEST
+import com.lagradost.cloudstream3.ui.result.getId
+import com.lagradost.cloudstream3.ui.search.SearchClickCallback
+import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
+import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showOptionSelectStringRes
+import com.lagradost.cloudstream3.utils.AppContextUtils.openBrowser
+import com.lagradost.cloudstream3.utils.UIHelper.navigate
+import com.lagradost.cloudstream3.utils.DataStoreHelper
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.RecyclerView
 import com.lagradost.cloudstream3.plugins.PluginManager
@@ -77,7 +101,6 @@ import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.attachBackPressedCallback
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.detachBackPressedCallback
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
-import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.EmptyEvent
 import com.lagradost.cloudstream3.utils.SubtitleHelper.getFlagFromIso
 import com.lagradost.cloudstream3.utils.TvChannelUtils
@@ -664,12 +687,35 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         fixSystemBarsPadding(
             view,
             padTop = false,
-            padBottom = isLandscape(),
+            padBottom = false,
             padLeft = isLayout(TV or EMULATOR)
         )
 
         // Fix grid
         configEvent.invoke()
+
+        val useComposeHome = isLayout(PHONE)
+        _binding?.apply {
+            if (useComposeHome) {
+                homeMasterRecycler.isGone = true
+                homeComposeView.isVisible = true
+            } else {
+                homeComposeView.isGone = true
+                homeMasterRecycler.isVisible = true
+                if (homeMasterAdapter == null) {
+                    homeMasterAdapter = HomeParentItemAdapterPreview(homeViewModel, accountViewModel)
+                    homeMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
+                    homeMasterRecycler.adapter = homeMasterAdapter
+                    homeViewModel.page.value?.let { pageData ->
+                        if (pageData is Resource.Success) {
+                            (homeMasterRecycler.adapter as? ParentItemAdapter)?.submitList(pageData.value.values.map {
+                                it.copy(list = it.list.copy(list = it.list.list.toMutableList()))
+                            })
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -678,28 +724,33 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         (activity as? ComponentActivity)?.attachBackPressedCallback("HomeFragment_BackPress") {
             handleTvBackPress(this)
         }
+
+        var composeApiName by mutableStateOf<String?>(homeViewModel.apiName.value)
+        var composePage by mutableStateOf<Resource<Map<String, HomeViewModel.ExpandableHomepageList>>?>(homeViewModel.page.value)
+        var composePreview by mutableStateOf<Resource<Pair<Boolean, List<LoadResponse>>>?>(homeViewModel.preview.value)
+        var composeResumeWatching by mutableStateOf<List<SearchResponse>>(homeViewModel.resumeWatching.value.orEmpty())
+        var composeBookmarks by mutableStateOf<Pair<Boolean, List<SearchResponse>>>(homeViewModel.bookmarks.value ?: (false to emptyList()))
+        var composeAvailableWatchTypes by mutableStateOf<Pair<Set<WatchType>, Set<WatchType>>>(
+            homeViewModel.availableWatchStatusTypes.value ?: (emptySet<WatchType>() to emptySet())
+        )
+        var composeCurrentAccount by mutableStateOf<DataStoreHelper.Account?>(homeViewModel.currentAccount.value)
+        var composeBookmarkRefreshTick by mutableStateOf(0)
+
         binding.apply {
-            //homeChangeApiLoading.setOnClickListener(apiChangeClickListener)
-            //homeChangeApiLoading.setOnClickListener(apiChangeClickListener)
-            homeApiFab.setOnClickListener(apiChangeClickListener)
-            homeApiFab.setOnLongClickListener {
-                if (currentApiName == noneApi.name) return@setOnLongClickListener false
-                homeViewModel.loadAndCancel(currentApiName, forceReload = true, fromUI = true)
-                showToast(R.string.action_reload, Toast.LENGTH_SHORT)
-                true
-            }
+
             homeChangeApi.setOnClickListener(apiChangeClickListener)
             homeSwitchAccount.setOnClickListener {
                 activity?.showAccountSelectLinear()
             }
 
-            homeMasterAdapter = HomeParentItemAdapterPreview(
-                homeViewModel, accountViewModel
-            )
-            homeMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
-            homeMasterRecycler.adapter = homeMasterAdapter
+            val useComposeHome = isLayout(PHONE)
+            if (!useComposeHome) {
+                homeComposeView.isGone = true
+                homeMasterAdapter = HomeParentItemAdapterPreview(homeViewModel, accountViewModel)
+                homeMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
+                homeMasterRecycler.adapter = homeMasterAdapter
+            }
 
-            homeApiFab.isVisible = isLayout(PHONE)
 
             homePreviewReloadProvider.setOnClickListener {
                 homeViewModel.loadAndCancel(
@@ -752,11 +803,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                     if (isLayout(PHONE)) {
                         // Fab is only relevant to Phone
                         if (dy > 0) { //check for scroll down
-                            homeApiFab.shrink() // hide
                             homeRandom.shrink()
                         } else if (dy < -5) {
                             if (isLayout(PHONE)) {
-                                homeApiFab.extend() // show
                                 homeRandom.extend()
                             }
                         }
@@ -806,6 +855,195 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
             homeMasterRecycler.doOnLayout { updateTvRailFocus() }
 
+            if (useComposeHome) {
+                homeMasterRecycler.isGone = true
+                homeLoading.isGone = true
+                homeLoadingError.isGone = true
+                homeComposeView.isVisible = true
+                homeComposeView.setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                )
+                homeComposeView.setContent {
+                    val _tick = composeBookmarkRefreshTick
+                    LiquidGlassTheme {
+                        HomeScreen(
+                            apiName = composeApiName,
+                            pageResource = composePage,
+                            previewResource = composePreview,
+                            resumeWatching = composeResumeWatching,
+                            bookmarks = composeBookmarks,
+                            availableWatchStatusTypes = composeAvailableWatchTypes,
+                            currentAccount = composeCurrentAccount,
+                            onSelectProviderClick = {
+                                context?.selectHomepage(currentApiName) { api ->
+                                    homeViewModel.loadAndCancel(api, forceReload = true, fromUI = true)
+                                }
+                            },
+                            onHeroItemClick = { _, loadResp, searchResp ->
+                                when {
+                                    loadResp != null -> homeViewModel.click(
+                                        LoadClickCallback(SEARCH_ACTION_LOAD, homeComposeView, -1, loadResp)
+                                    )
+                                    searchResp != null -> homeViewModel.click(
+                                        SearchClickCallback(SEARCH_ACTION_LOAD, homeComposeView, -1, searchResp)
+                                    )
+                                }
+                            },
+                            onHeroPlayClick = { _, loadResp, searchResp ->
+                                when {
+                                    loadResp != null -> homeViewModel.click(
+                                        LoadClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, loadResp)
+                                    )
+                                    searchResp != null -> homeViewModel.click(
+                                        SearchClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, searchResp)
+                                    )
+                                }
+                            },
+                            onHeroBookmarkClick = { _, loadResp, searchResp ->
+                                val ctx = context ?: return@HomeScreen
+                                if (loadResp != null) {
+                                    val id = loadResp.getId()
+                                    ctx.getActivity()?.showBottomDialog(
+                                        WatchType.entries.map { ctx.getString(it.stringRes) }.toList(),
+                                        DataStoreHelper.getResultWatchState(id).ordinal,
+                                        ctx.getString(R.string.action_add_to_bookmarks),
+                                        showApply = false,
+                                        {}
+                                    ) { idx ->
+                                        val newValue = WatchType.entries[idx]
+                                        ResultViewModel2().updateWatchStatus(newValue, ctx, loadResp) {
+                                            composeBookmarkRefreshTick++
+                                            homeViewModel.reloadStored()
+                                        }
+                                    }
+                                } else if (searchResp != null) {
+                                    (activity as? MainActivity)?.loadPopup(searchResp, load = false)
+                                }
+                            },
+                            isHeroBookmarked = { _, loadResp, searchResp ->
+                                val _unused = _tick
+                                val id = loadResp?.getId() ?: searchResp?.id
+                                if (id != null) {
+                                    DataStoreHelper.getResultWatchState(id) != WatchType.NONE
+                                } else {
+                                    false
+                                }
+                            },
+                            onLoadMoreHero = {
+                                // Handled automatically by HomeHeroSection
+                            },
+                            onContinueWatchingClick = { card ->
+                                homeViewModel.click(
+                                    SearchClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, card)
+                                )
+                            },
+                            onContinueWatchingLongClick = { card ->
+                                context?.getActivity()?.showOptionSelectStringRes(
+                                    homeComposeView,
+                                    card.posterUrl,
+                                    listOf(
+                                        R.string.action_open_watching,
+                                        R.string.action_remove_watching
+                                    ),
+                                    listOf(
+                                        R.string.action_open_play,
+                                        R.string.action_open_watching,
+                                        R.string.action_remove_watching
+                                    )
+                                ) { (isTv, actionId) ->
+                                    when (actionId + if (isTv) 0 else 1) {
+                                        0 -> homeViewModel.click(
+                                            SearchClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, card)
+                                        )
+                                        1 -> homeViewModel.click(
+                                            SearchClickCallback(SEARCH_ACTION_LOAD, homeComposeView, -1, card)
+                                        )
+                                        2 -> {
+                                            if (card is DataStoreHelper.ResumeWatchingResult) {
+                                                DataStoreHelper.removeLastWatched(card.parentId)
+                                                homeViewModel.reloadStored()
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onContinueWatchingViewAll = {
+                                homeViewModel.popup(
+                                    HomeViewModel.ExpandableHomepageList(
+                                        HomePageList(
+                                            getString(R.string.continue_watching),
+                                            composeResumeWatching,
+                                            false
+                                        ),
+                                        1,
+                                        false
+                                    ),
+                                    deleteCallback = {
+                                        homeViewModel.deleteResumeWatching()
+                                    }
+                                )
+                            },
+                            onWatchTypeToggle = { selectedSet ->
+                                homeViewModel.loadStoredData(selectedSet)
+                            },
+                            onBookmarksViewAll = { title, list ->
+                                homeViewModel.popup(
+                                    HomeViewModel.ExpandableHomepageList(
+                                        HomePageList(title, list, false),
+                                        1,
+                                        false
+                                    ),
+                                    deleteCallback = {
+                                        homeViewModel.deleteBookmarks(list)
+                                    }
+                                )
+                            },
+                            onCatalogItemClick = { card ->
+                                homeViewModel.click(
+                                    SearchClickCallback(SEARCH_ACTION_LOAD, homeComposeView, -1, card)
+                                )
+                            },
+                            onCatalogItemLongClick = { card ->
+                                (activity as? MainActivity)?.loadPopup(card, load = false)
+                            },
+                            onCatalogViewAllClick = { section ->
+                                homeViewModel.popup(section)
+                            },
+                            onCatalogExpand = { name ->
+                                homeViewModel.expand(name)
+                            },
+                            onOpenInBrowserClick = {
+                                val currentApi = currentApiName?.let { getApiFromNameNull(it) }
+                                    ?: homeViewModel.apiName.value?.let { getApiFromNameNull(it) }
+                                val mainUrl = currentApi?.mainUrl
+                                if (!mainUrl.isNullOrBlank()) {
+                                    context?.openBrowser(mainUrl)
+                                }
+                            },
+                            onGoToDownloadsClick = {
+                                activity.navigate(R.id.navigation_downloads)
+                            }
+                        )
+                    }
+                }
+            }
+
+            observe(homeViewModel.preview) { previewData ->
+                composePreview = previewData
+            }
+            observe(homeViewModel.resumeWatching) { resumeData ->
+                composeResumeWatching = resumeData
+            }
+            observe(homeViewModel.bookmarks) { bookmarksData ->
+                composeBookmarks = bookmarksData
+            }
+            observe(homeViewModel.availableWatchStatusTypes) { watchTypesData ->
+                composeAvailableWatchTypes = watchTypesData
+            }
+            observe(homeViewModel.currentAccount) { accountData ->
+                composeCurrentAccount = accountData
+            }
+
         }
 
         //Load value for toggling Random button. Hide at startup
@@ -822,9 +1060,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
         observe(homeViewModel.apiName) { apiName ->
             currentApiName = apiName
+            composeApiName = apiName
             val displayApiName = context?.getDisplayName(apiName) ?: apiName
             binding.apply {
-                homeApiFab.text = displayApiName
                 homeChangeApi.text = displayApiName
                 homePreviewReloadProvider.isGone = (apiName == noneApi.name)
                 homePreviewSearchButton.isGone = (apiName == noneApi.name)
@@ -832,6 +1070,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         }
 
         observe(homeViewModel.page) { data ->
+            composePage = data
+            val useComposeHome = isLayout(PHONE)
+            if (useComposeHome) {
+                binding.homeMasterRecycler.isGone = true
+                binding.homeLoading.isGone = true
+                binding.homeLoadingError.isGone = true
+                binding.homeComposeView.isVisible = true
+                return@observe
+            }
             binding.apply {
                 if (isLayout(TV or EMULATOR)) {
                     val plugin = APIHolder.getApiFromNameNull(homeViewModel.apiName.value)

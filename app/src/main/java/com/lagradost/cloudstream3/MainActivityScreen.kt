@@ -63,7 +63,7 @@ object MainActivityScreen : Screen {
                 remotePrereleaseTag = APK_PRERELEASE,
                 remoteContentType = APK_CONTENT_TYPE,
                 versionName = BuildConfig.VERSION_NAME,
-                isPrerelease = BuildConfig.FLAVOR == "prerelease",
+                isPrerelease = false,
                 isDebug = BuildConfig.DEBUG,
                 buildSha = activity.currentCommitHash(),
                 settings = settings,

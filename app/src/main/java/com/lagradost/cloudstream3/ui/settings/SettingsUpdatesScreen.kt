@@ -22,7 +22,6 @@ import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.services.BackupWorkManager
 import com.lagradost.cloudstream3.utils.BackupUtils
 import com.lagradost.cloudstream3.utils.BackupUtils.restorePrompt
-import com.lagradost.cloudstream3.utils.InAppUpdater.installPreReleaseIfNeeded
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream4.AppSettings
 import com.lagradost.cloudstream4.rememberAppSettings
@@ -90,24 +89,6 @@ object SettingsUpdatesScreen : SearchableSettings {
                         icon = painterResource(R.drawable.mobile_arrow_down_24px),
                         onClick = {
                             githubViewModel?.onAction(GithubAction.SearchForUpdate)
-                            /*ioSafe {
-                                if (activity?.runAutoUpdate(false) == false) {
-                                    activity?.runOnUiThread {
-                                        showToast(
-                                            R.string.no_update_found,
-                                            Toast.LENGTH_SHORT
-                                        )
-                                    }
-                                }
-                            }*/
-                        }
-                    ),
-                    Preference.PreferenceItem.TextPreference(
-                        title = stringResource(R.string.install_prerelease),
-                        icon = painterResource(R.drawable.mobile_code_24px),
-                        enabled = BuildConfig.FLAVOR == "stable",
-                        onClick = {
-                            activity?.installPreReleaseIfNeeded()
                         }
                     ),
 

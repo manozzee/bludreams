@@ -8,57 +8,34 @@ import androidx.preference.PreferenceManager
 
 fun perfToMode(perf: String?) =
     when (perf) {
-        "System" -> CloudStreamThemeMode.FollowSystem
-        "Black" -> CloudStreamThemeMode.Dark
-        "Light" -> CloudStreamThemeMode.Light
         "Amoled" -> CloudStreamThemeMode.Amoled
-        "AmoledLight" -> CloudStreamThemeMode.AmoledLight
-        "Dracula" -> CloudStreamThemeMode.Dracula
-        "Lavender" -> CloudStreamThemeMode.Lavender
-        "SilentBlue" -> CloudStreamThemeMode.SilentBlue
-        "Monet" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            CloudStreamThemeMode.Dynamic
-        } else {
-            CloudStreamThemeMode.Dark
-        }
-
         else -> CloudStreamThemeMode.Dark
     }
 
-fun perfToColor(perf : String?) = when (perf) {
-    "Normal" -> CloudStreamPrimaryColor.NORMAL
-    "Blue" -> CloudStreamPrimaryColor.BLUE
-    "Purple" -> CloudStreamPrimaryColor.PURPLE
-    "Green" -> CloudStreamPrimaryColor.GREEN
-    "GreenApple" -> CloudStreamPrimaryColor.GREEN_APPLE
-    "Red" -> CloudStreamPrimaryColor.RED
-    "Banana" -> CloudStreamPrimaryColor.BANANA
-    "Party" -> CloudStreamPrimaryColor.PARTY
-    "Pink" -> CloudStreamPrimaryColor.PINK
-    "CarnationPink" -> CloudStreamPrimaryColor.CARNATION_PINK
-    "Maroon" -> CloudStreamPrimaryColor.MAROON
-    "DarkGreen" -> CloudStreamPrimaryColor.DARK_GREEN
-    "NavyBlue" -> CloudStreamPrimaryColor.NAVY_BLUE
-    "Grey" -> CloudStreamPrimaryColor.GREY
-    "White" -> CloudStreamPrimaryColor.WHITE
-    "Brown" -> CloudStreamPrimaryColor.BROWN
-    "Orange" -> CloudStreamPrimaryColor.ORANGE
-    "DandelionYellow" -> CloudStreamPrimaryColor.DANDELION_YELLOW
-    "CoolBlue" -> CloudStreamPrimaryColor.COOL_BLUE
-    "Lavender" -> CloudStreamPrimaryColor.LAVENDER
+fun boolToMode(pureBlack: Boolean) =
+    if (pureBlack) CloudStreamThemeMode.Amoled else CloudStreamThemeMode.Dark
+
+fun perfToColor(perf: String?) = when (perf) {
+    "VelvetNoir" -> CloudStreamPrimaryColor.VELVET_NOIR
+    "AuraBrass" -> CloudStreamPrimaryColor.AURA_BRASS
+    "SmokedCognac" -> CloudStreamPrimaryColor.SMOKED_COGNAC
+    "ObsidianPine" -> CloudStreamPrimaryColor.OBSIDIAN_PINE
+    "FincherTeal" -> CloudStreamPrimaryColor.FINCHER_TEAL
+    "MidnightLapis" -> CloudStreamPrimaryColor.MIDNIGHT_LAPIS
+    "NocturneViolet" -> CloudStreamPrimaryColor.NOCTURNE_VIOLET
     "Monet" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         CloudStreamPrimaryColor.DYNAMIC
     } else {
-        CloudStreamPrimaryColor.NORMAL
+        CloudStreamPrimaryColor.VELVET_NOIR
     }
 
     "Monet2" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         CloudStreamPrimaryColor.DYNAMIC_TWO
     } else {
-        CloudStreamPrimaryColor.NORMAL
+        CloudStreamPrimaryColor.VELVET_NOIR
     }
 
-    else -> CloudStreamPrimaryColor.NORMAL
+    else -> CloudStreamPrimaryColor.VELVET_NOIR
 }
 
 fun Context.loadThemeMode(): CloudStreamThemeMode {
@@ -68,5 +45,5 @@ fun Context.loadThemeMode(): CloudStreamThemeMode {
 
 fun Context.loadPrimaryColor(): CloudStreamPrimaryColor {
     val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-    return perfToColor(prefs.getString("primary_color_key", "Normal"))
+    return perfToColor(prefs.getString("primary_color_key", "VelvetNoir"))
 }

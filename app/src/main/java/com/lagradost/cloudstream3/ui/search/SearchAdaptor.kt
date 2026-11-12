@@ -1,9 +1,16 @@
 package com.lagradost.cloudstream3.ui.search
 
-import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.coerceAtLeast
+import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.databinding.SearchResultGridBinding
 import com.lagradost.cloudstream3.databinding.SearchResultGridExpandedBinding
@@ -11,9 +18,11 @@ import com.lagradost.cloudstream3.ui.AutofitRecyclerView
 import com.lagradost.cloudstream3.ui.BaseDiffCallback
 import com.lagradost.cloudstream3.ui.NoStateAdapter
 import com.lagradost.cloudstream3.ui.ViewHolderState
+import com.lagradost.cloudstream3.ui.home.ComposeViewBinding
+import com.lagradost.cloudstream3.ui.home.PosterCardFromSearchResponse
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
+import com.lagradost.cloudstream3.ui.liquidglass.PosterShape
 import com.lagradost.cloudstream3.ui.newSharedPool
-import com.lagradost.cloudstream3.utils.UIHelper.isBottomLayout
-import kotlin.math.roundToInt
 
 /** Click */
 const val SEARCH_ACTION_LOAD = 0
@@ -32,7 +41,7 @@ class SearchClickCallback(
 
 class SearchAdapter(
     private val resView: AutofitRecyclerView,
-    private val isHorizontal:Boolean = false,
+    private val isHorizontal: Boolean = false,
     private val clickCallback: (SearchClickCallback) -> Unit,
 ) : NoStateAdapter<SearchResponse>(diffCallback = BaseDiffCallback(itemSame = { a, b ->
     if (a.id != null || b.id != null) {
@@ -43,32 +52,26 @@ class SearchAdapter(
 })) {
     companion object {
         val sharedPool =
-            newSharedPool { setMaxRecycledViews(CONTENT, 10) }
+            newSharedPool { setMaxRecycledViews(CONTENT, 15) }
     }
 
     var hasNext: Boolean = false
 
-    private val coverRatio = if(isHorizontal) 1.8 else 0.68
-
-    private val coverHeight: Int get() = (resView.itemWidth / coverRatio).roundToInt()
-
     override fun onCreateContent(parent: ViewGroup): ViewHolderState<Any> {
-        val inflater = LayoutInflater.from(parent.context)
-
-        val layout =
-            if (parent.context.isBottomLayout()) SearchResultGridExpandedBinding.inflate(
-                inflater,
-                parent,
-                false
-            ) else SearchResultGridBinding.inflate(
-                inflater,
-                parent,
-                false
+        val composeView = ComposeView(parent.context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
-        return ViewHolderState(layout)
+            setViewCompositionStrategy(
+                ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+            )
+        }
+        return ViewHolderState(ComposeViewBinding(composeView))
     }
 
     override fun onClearView(holder: ViewHolderState<Any>) {
+        ((holder.view as? ComposeViewBinding)?.composeView ?: holder.itemView as? ComposeView)?.disposeComposition()
         clearImage(
             when (val binding = holder.view) {
                 is SearchResultGridExpandedBinding -> binding.imageView
@@ -79,21 +82,47 @@ class SearchAdapter(
     }
 
     override fun onBindContent(holder: ViewHolderState<Any>, item: SearchResponse, position: Int) {
-        val imageView = when (val binding = holder.view) {
-            is SearchResultGridExpandedBinding -> binding.imageView
-            is SearchResultGridBinding -> binding.imageView
-            else -> null
-        }
-
-        if (imageView != null) {
-            val params = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                coverHeight
-            )
-            if (imageView.layoutParams.width != params.width || imageView.layoutParams.height != params.height) {
-                imageView.layoutParams = params
+        val composeView = (holder.view as? ComposeViewBinding)?.composeView ?: holder.itemView as? ComposeView
+        if (composeView != null) {
+            composeView.setContent {
+                LiquidGlassTheme {
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val targetWidth = (maxWidth - 8.dp).coerceAtLeast(10.dp)
+                        PosterCardFromSearchResponse(
+                            item = item,
+                            forceShape = if (isHorizontal) PosterShape.Landscape else null,
+                            customWidth = targetWidth,
+                            onClick = {
+                                clickCallback(
+                                    SearchClickCallback(
+                                        action = SEARCH_ACTION_LOAD,
+                                        view = holder.itemView,
+                                        position = position,
+                                        card = item
+                                    )
+                                )
+                            },
+                            onLongClick = {
+                                clickCallback(
+                                    SearchClickCallback(
+                                        action = SEARCH_ACTION_SHOW_METADATA,
+                                        view = holder.itemView,
+                                        position = position,
+                                        card = item
+                                    )
+                                )
+                            }
+                        )
+                    }
+                }
             }
+        } else {
+            SearchResultBuilder.bind(clickCallback, item, position, holder.view.root)
         }
-        SearchResultBuilder.bind(clickCallback, item, position, holder.view.root)
     }
 }
