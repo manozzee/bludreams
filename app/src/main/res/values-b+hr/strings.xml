@@ -703,9 +703,6 @@
     <string name="action_reload">Ponovo učitano</string>
     <string name="reload_provider">Usluga ponovnog učitavanja</string>
     <string name="play_full_series_button">Reproduciraj cijelu seriju</string>
-    <string name="install_prerelease">Instaliraj predizdanje</string>
-    <string name="prerelease_already_installed">Predizdanje je već instalirano.</string>
-    <string name="prerelease_install_failed">Instalacija predizdanja nije uspjela.</string>
     <string name="episode_action_play_mirror">Pokreni duplikat</string>"
     <string name="show_episode_text">Tekst epizode</string>
     <string name="name">Ime</string>

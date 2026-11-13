@@ -8,21 +8,21 @@
     <color name="colorAccent">#3b65f5</color> <!-- 818fff-->
 
     <!-- Default Luxury Dark Slate / Charcoal Palette (AMOLED Off) -->
-    <color name="primaryGrayBackground">#17171A</color> <!-- Elevated cards -->
+    <color name="primaryGrayBackground">#21232A</color> <!-- Elevated cards -->
     <color name="primaryBlackBackground">#131417</color> <!-- Root window & canvas background -->
-    <color name="iconGrayBackground">#222328</color> <!-- Elevated dialogs / surfaces -->
-    <color name="boxItemBackground">#17171A</color> <!-- Elevated containers & sheets -->
+    <color name="iconGrayBackground">#2A2D36</color> <!-- Elevated dialogs / surfaces -->
+    <color name="boxItemBackground">#21232A</color> <!-- Elevated containers & sheets -->
 
     <color name="textColor">#e9eaee</color> <!--FFF-->
-    <color name="grayTextColor">#9ba0a4</color> <!-- 5e5f62-->
+    <color name="grayTextColor">#A4AAB3</color> <!-- 5e5f62-->
     <color name="grayShimmer">#DCDCDC</color> <!-- 5e5f62-->
 
-    <color name="searchColorTransparent">#1AFFFFFF</color> <!--DADADA-->
+    <color name="searchColorTransparent">#1FFFFFFF</color> <!--DADADA-->
     <color name="transparent">#00000000</color>
 
-    <color name="grouped_card_background">#17171A</color>
+    <color name="grouped_card_background">#21232A</color>
     <color name="grouped_app_background">#131417</color>
-    <color name="grouped_icon_tile_bg">#222328</color>
+    <color name="grouped_icon_tile_bg">#2A2D36</color>
 
     <color name="white">#FFF</color>
     <color name="black">#000</color>

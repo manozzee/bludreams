@@ -27,14 +27,11 @@ sealed class GithubUpdateDialogState {
     object NoUpdateFound : GithubUpdateDialogState()
     data class UpdateFound(
         val file: GithubFile,
-        val newSha: String?,
-        val oldSha: String?,
     ) : GithubUpdateDialogState()
 }
 
 @Immutable
 data class GithubDialog(
-    val isPrerelease: Boolean,
     val isFromUser: Boolean,
     val state: GithubUpdateDialogState,
 )
@@ -50,7 +47,7 @@ data class GithubFile(
     val displayName: String,
     /** Changelog, aka the commit message */
     val changeLog: String,
-    /** Name of the tag, aka unique release name like vX.X.X or pre-release */
+    /** Name of the tag, aka unique release name like vX.X.X */
     val tagName: String,
     /** Unique node id */
     val nodeId: String,
@@ -81,17 +78,8 @@ interface GithubRepository {
     suspend fun getRelease(
         userName: String,
         repository: String,
-        prerelease: Boolean,
-        prereleaseTag: String,
         contentType: String,
     ): GithubFile
-
-    @Throws
-    suspend fun getSha(
-        userName: String,
-        repository: String,
-        tag: String,
-    ): String
 }
 
 /** The digest pair to verify that a file is correctly downloaded */
@@ -153,12 +141,9 @@ data class DigestPair(
 class GithubViewModel(
     val remoteUserName: String,
     val remoteRepository: String,
-    val remotePrereleaseTag: String,
     val remoteContentType: String,
     val versionName: String,
-    val isPrerelease: Boolean,
     val isDebug: Boolean,
-    val buildSha: String,
     val settings: AppSettings,
     val updater: AppUpdater,
     val repository: GithubRepository,
@@ -170,7 +155,7 @@ class GithubViewModel(
         when (action) {
             GithubAction.SearchForUpdate -> {
                 ioSafe {
-                    searchForUpdate(prerelease = isPrerelease, fromUser = true)
+                    searchForUpdate(fromUser = true)
                 }
             }
 
@@ -188,7 +173,7 @@ class GithubViewModel(
             GithubAction.AutoSearchForUpdate -> {
                 if (!isDebug && settings.updates.showAppUpdates.get()) {
                     ioSafe {
-                        searchForUpdate(prerelease = isPrerelease, fromUser = false)
+                        searchForUpdate(fromUser = false)
                     }
                 }
             }
@@ -248,11 +233,9 @@ class GithubViewModel(
     }
 
     private suspend fun searchForUpdate(
-        prerelease: Boolean,
         fromUser: Boolean,
     ) = dispatchUpdate {
         val baseDialog = GithubDialog(
-            isPrerelease = prerelease,
             isFromUser = fromUser,
             state = GithubUpdateDialogState.Loading
         )
@@ -261,37 +244,14 @@ class GithubViewModel(
             copy(dialog = baseDialog)
         }
 
-        // If on pre-release check if the sha matches, as we do not look at the version
-        var oldSha: String? = null
-        var newSha: String? = null
-        if (prerelease) {
-            val sha = repository.getSha(
-                tag = remotePrereleaseTag,
-                userName = remoteUserName,
-                repository = remoteRepository,
-            )
-            oldSha = buildSha.take(7)
-            newSha = sha.take(7)
-
-            // Only match the first 7 chars, as that is what is saved
-            if (oldSha == newSha) {
-                updateState {
-                    copy(dialog = baseDialog.copy(state = GithubUpdateDialogState.NoUpdateFound))
-                }
-                return@dispatchUpdate
-            }
-        }
-
         val release = repository.getRelease(
-            prerelease = prerelease,
             userName = remoteUserName,
             repository = remoteRepository,
-            prereleaseTag = remotePrereleaseTag,
             contentType = remoteContentType
         )
 
-        // If on stable, only check that the display name matches
-        if (!prerelease && release.displayName == versionName) {
+        // Check that the display name matches the current version
+        if (release.displayName == versionName) {
             updateState {
                 copy(dialog = baseDialog.copy(state = GithubUpdateDialogState.NoUpdateFound))
             }
@@ -311,8 +271,6 @@ class GithubViewModel(
                 dialog = baseDialog.copy(
                     state = GithubUpdateDialogState.UpdateFound(
                         file = release,
-                        newSha = newSha,
-                        oldSha = oldSha
                     )
                 )
             )

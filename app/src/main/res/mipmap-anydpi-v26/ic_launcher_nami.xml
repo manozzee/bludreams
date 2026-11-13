@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_bg_nami" />
+    <foreground>
+        <inset
+            android:drawable="@drawable/ic_fg_nami"
+            android:inset="8%" />
+    </foreground>
+    <monochrome android:drawable="@drawable/ic_cloudstream_monochrome" />
+</adaptive-icon>

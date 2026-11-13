@@ -328,9 +328,6 @@
     <string name="episode_action_play_mirror">Play mirror</string>"
     <string name="show_hd">कितना hd है वो वाला लेबल</string>
     <string name="play_full_series_button">पूरी सीरीज़ शरु करे</string>
-    <string name="install_prerelease">प्री-रिलीज़ संस्करण स्थापित करें</string>
-    <string name="prerelease_already_installed">प्री-रिलीज़ पहले से ही स्थापित है।</string>
-    <string name="prerelease_install_failed">प्री-रिलीज़ इंस्टॉल करने में विफल रहा।</string>
     <string name="show_dub">डब लेबल</string>
     <string name="show_sub">सब लेबल</string>
     <string name="show_rating">रेटिंग लेबल</string>

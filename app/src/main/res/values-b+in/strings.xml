@@ -716,9 +716,6 @@
     <string name="top_center">Atas tengah</string>
     <string name="top_right">Atas kanan</string>
     <string name="play_full_series_button">Putar Seri Penuh</string>
-    <string name="install_prerelease">Pasang versi pra-rilis</string>
-    <string name="prerelease_already_installed">Versi pra-rilis sudah terpasang.</string>
-    <string name="prerelease_install_failed">Gagal memasang versi pra-rilis.</string>
     <string name="show_episode_text">Teks Episode</string>
     <string name="extra_brightness_settings">Kecerahan ekstra</string>
     <string name="extra_brightness_settings_des">Aktifkan filter kecerahan saat kecerahan layar melebihi 100%</string>

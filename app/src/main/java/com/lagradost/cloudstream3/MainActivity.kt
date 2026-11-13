@@ -1735,7 +1735,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             .setPopUpTo(navController.graph.startDestination, false)
             .build()*/
 
-        val rippleColor = ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.1f))
+        val rippleColor = ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.16f))
+        val activeIndicatorColor = ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.38f))
 
         val selectedTabIdState = mutableStateOf(
             navController.currentDestination?.id?.let { destId ->
@@ -1936,7 +1937,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         binding?.navView?.apply {
             itemRippleColor = rippleColor
-            itemActiveIndicatorColor = rippleColor
+            itemActiveIndicatorColor = activeIndicatorColor
             setupWithNavController(navController)
             setOnItemSelectedListener { item ->
                 onNavDestinationSelected(
@@ -1950,12 +1951,12 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         binding?.navRailView?.apply {
             if (isLayout(PHONE)) {
                 itemRippleColor = rippleColor
-                itemActiveIndicatorColor = rippleColor
+                itemActiveIndicatorColor = activeIndicatorColor
             } else {
                 val subtleRipple = ColorStateList.valueOf(getResourceColor(android.R.attr.colorControlHighlight))
                 itemSpacing = 12.toPx // expandedItemSpacing does not have an attr
                 itemRippleColor = subtleRipple
-                itemActiveIndicatorColor = rippleColor
+                itemActiveIndicatorColor = activeIndicatorColor
             }
             setupWithNavController(navController)
             /*if (isLayout(TV or EMULATOR)) {

@@ -74,6 +74,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         // If we want to initialize Coil as early as possible, maybe when
         // loading an image or GIF in a splash screen activity.
         // buildImageLoader(applicationContext)
+        com.lagradost.cloudstream3.ui.settings.AppIconRegistry.ensureLoaded(this)
 
         ExceptionHandler(filesDir.resolve("last_error")) {
             val intent = context!!.packageManager.getLaunchIntentForPackage(context!!.packageName)

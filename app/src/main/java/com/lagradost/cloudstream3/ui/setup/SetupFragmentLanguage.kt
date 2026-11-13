@@ -3,11 +3,12 @@ package com.lagradost.cloudstream3.ui.setup
 import android.view.View
 import android.widget.AbsListView
 import android.widget.ArrayAdapter
-import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.preference.PreferenceManager
-import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.setKey
 import com.lagradost.cloudstream3.CommonActivity
 import com.lagradost.cloudstream3.databinding.FragmentSetupLanguageBinding
@@ -15,10 +16,12 @@ import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.plugins.PluginManager
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.ui.BaseFragment
+import com.lagradost.cloudstream3.ui.settings.AppIconRegistry
 import com.lagradost.cloudstream3.ui.settings.appLanguages
 import com.lagradost.cloudstream3.ui.settings.getCurrentLocale
 import com.lagradost.cloudstream3.ui.settings.nameNextToFlagEmoji
 import com.lagradost.cloudstream3.utils.UIHelper.fixSystemBarsPadding
+import kotlinx.coroutines.launch
 
 const val HAS_DONE_SETUP_KEY = "HAS_DONE_SETUP"
 
@@ -35,6 +38,7 @@ class SetupFragmentLanguage : BaseFragment<FragmentSetupLanguageBinding>(
         safe {
             val ctx = context ?: return@safe
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+            AppIconRegistry.ensureLoaded(ctx)
 
             val arrayAdapter =
                 ArrayAdapter<String>(ctx, R.layout.sort_bottom_single_choice)
@@ -42,11 +46,16 @@ class SetupFragmentLanguage : BaseFragment<FragmentSetupLanguageBinding>(
             binding.apply {
                 // Icons may crash on some weird android versions?
                 safe {
-                    val drawable = when {
-                        BuildConfig.DEBUG -> R.drawable.cloud_2_gradient_debug
-                        else -> R.drawable.cloud_2_gradient
+                    AppIconRegistry.applyToImageView(appIconImage)
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                            AppIconRegistry.currentIcon.collect { activeIcon ->
+                                safe {
+                                    AppIconRegistry.applyToImageView(appIconImage, activeIcon)
+                                }
+                            }
+                        }
                     }
-                    appIconImage.setImageDrawable(ContextCompat.getDrawable(ctx, drawable))
                 }
 
                 val tags = appLanguages.map { it.second }

@@ -22,19 +22,19 @@ internal object CloudStreamPalette {
     val Ongoing = Color(0xFFF53B66)
 
     // Default luxury dark charcoal / slate profile (AMOLED Off)
-    val DarkPrimaryGrayBg = Color(0xFF202227) // Elevated cards
+    val DarkPrimaryGrayBg = Color(0xFF21232A) // Elevated cards
     val DarkBlackBg = Color(0xFF131417)        // Root window / canvas
-    val DarkIconGrayBg = Color(0xFF26282E)     // Elevated dialogs / surfaces
-    val DarkBoxItemBg = Color(0xFF1B1C21)      // Elevated containers / bottom sheets
+    val DarkIconGrayBg = Color(0xFF2A2D36)     // Elevated dialogs / surfaces
+    val DarkBoxItemBg = Color(0xFF21232A)      // Elevated containers / bottom sheets
     val DarkText = Color(0xFFE9EAEE)
-    val DarkGrayText = Color(0xFF9BA0A4)
-    val DarkIcon = Color(0xFF9BA0A6)
+    val DarkGrayText = Color(0xFFA4AAB3)
+    val DarkIcon = Color(0xFFA4AAB3)
 
     // Pure Black / AMOLED (AMOLED On)
     val AmoledBlack = Color(0xFF000000)
-    val AmoledElevated = Color(0xFF0F0F12)
-    val AmoledCard = Color(0xFF141418)
-    val AmoledNearBlack = Color(0xFF121212)
+    val AmoledElevated = Color(0xFF1E2027)
+    val AmoledCard = Color(0xFF14151A)
+    val AmoledNearBlack = Color(0xFF14151A)
 
     // Light
     val LightPrimaryGrayBg = Color(0xFFF1F1F1)

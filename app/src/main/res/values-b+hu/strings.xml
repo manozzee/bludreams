@@ -587,9 +587,6 @@
     <string name="search_suggestions_des">Mutasson keresési javaslatok gépelés közben</string>
     <string name="clear_suggestions">Javaslatok törlése</string>
     <string name="show_cast_in_details">Szereplők panel megjelenítése</string>
-    <string name="install_prerelease">Telepít kiadás előtti verziót</string>
-    <string name="prerelease_already_installed">Az előzetes verzió már telepítve van.</string>
-    <string name="prerelease_install_failed">Az előzetes verzió telepítése sikertelen.</string>
     <string name="delete_files">Fájlok törlése</string>
     <string name="delete_message_series_only" formatted="true">Biztosan törölni szeretné az alábbi sorozat összes megjelenését?\n\n%s</string>
     <string name="resume_remaining" formatted="true">%s \nmaradék</string>

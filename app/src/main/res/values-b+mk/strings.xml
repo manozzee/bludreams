@@ -715,9 +715,6 @@
     <string name="clear_suggestions">Исчисти предлози</string>
     <string name="show_player_metadata_overlay">Прикажи преклоп со метаподатоци на плеерот</string>
     <string name="show_cast_in_details">Прикажи панел за емитување</string>
-    <string name="install_prerelease">Инсталирај предиздавачка верзија</string>
-    <string name="prerelease_already_installed">Предиздавачката верзија е веќе инсталирана.</string>
-    <string name="prerelease_install_failed">Неуспешна инсталација на предиздавачката верзија.</string>
     <string name="video_singular">Видео</string>
     <string name="show_episode_text">Текст на епизода</string>
     <string name="video_info">Информации за медиумот</string>

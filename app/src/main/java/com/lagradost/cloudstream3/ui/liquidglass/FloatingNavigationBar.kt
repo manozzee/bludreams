@@ -144,7 +144,7 @@ fun FloatingNavigationBar(
     )
     val tokens = MaterialTheme.liquidGlass
     val accentColor = tokens.colors.accent
-    val selectedSurface = accentColor.copy(alpha = LiquidGlassTokens.Opacity.selected)
+    val selectedSurface = accentColor.copy(alpha = 0.45f)
     val labelFraction by animateFloatAsState(
         targetValue = scrollState?.labelVisibility ?: 1f,
         animationSpec = tween(LiquidGlassTokens.Motion.sheetEnterMillis, easing = LiquidGlassTokens.Motion.standard),

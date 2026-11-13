@@ -8,13 +8,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.dp
 import kotlin.math.min
 
 internal fun DrawScope.drawJellyGlow(frame: JellyFrame, color: Color) {
     if (frame.glowOpacity <= 0f || color.alpha <= 0f) return
-    val alpha = 0.15f * frame.glowOpacity * color.alpha
+    val alpha = 0.24f * frame.glowOpacity * color.alpha
     drawRect(
         brush = Brush.radialGradient(
             0f to color.copy(alpha = alpha),
@@ -54,9 +55,11 @@ internal fun DrawScope.drawJellyPill(
     count: Int,
     surfaceColor: Color,
     glowColor: Color,
+    borderColor: Color = Color.White.copy(alpha = 0.18f),
     content: () -> Unit,
 ) {
-    clipPath(jellyPillPath(frame, count)) {
+    val pillPath = jellyPillPath(frame, count)
+    clipPath(pillPath) {
         drawRect(
             color = surfaceColor,
             topLeft = Offset(-48.dp.toPx(), -16.dp.toPx()),
@@ -64,5 +67,10 @@ internal fun DrawScope.drawJellyPill(
         )
         drawJellyGlow(frame, glowColor)
         content()
+        drawPath(
+            path = pillPath,
+            color = borderColor,
+            style = Stroke(width = 1.dp.toPx()),
+        )
     }
 }

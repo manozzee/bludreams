@@ -29,56 +29,22 @@ object GithubReleases : GithubRepository {
         @JsonProperty("created_at") @SerialName("created_at") val createdAt: String, // YYYY-MM-DDTHH:MM:SSZ
     )
 
-    @Serializable
-    private data class GithubObject(
-        @JsonProperty("sha") @SerialName("sha") val sha: String, // SHA-256 hash
-        //@JsonProperty("type") @SerialName("type") val type: String,
-        ///@JsonProperty("url") @SerialName("url") val url: String,
-    )
-
-    @Serializable
-    private data class GithubTag(
-        //@JsonProperty("node_id") @SerialName("node_id") val nodeId: String,
-        @JsonProperty("object") @SerialName("object") val githubObject: GithubObject,
-    )
-
     const val APK_USERNAME = "manozzee"
     const val APK_REPOSITORY = "bludreams"
-    const val APK_PRERELEASE = "pre-release"
     const val APK_CONTENT_TYPE = "application/vnd.android.package-archive"
 
     private val defaultHeaders = mapOf("Accept" to "application/vnd.github.v3+json")
 
     @Throws
-    override suspend fun getSha(
-        userName: String,
-        repository: String,
-        tag: String,
-    ): String {
-        return app.get(
-            url = "https://api.github.com/repos/$userName/$repository/git/ref/tags/$tag",
-            headers = defaultHeaders
-        ).parsed<GithubTag>().githubObject.sha
-    }
-
-    @Throws
     override suspend fun getRelease(
         userName: String,
         repository: String,
-        prerelease: Boolean,
-        prereleaseTag: String,
         contentType: String,
     ): GithubFile {
-        val latestReleaseUrl = if (prerelease) {
-            // Find the release object
-            // https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#get-a-release-by-tag-name
-            "https://api.github.com/repos/$userName/$repository/releases/tags/$prereleaseTag"
-        } else {
-            // Just get the latest release
-            // https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#get-the-latest-release
-            // The latest release is the most recent non-prerelease, non-draft release, sorted by the created_at attribute
-            "https://api.github.com/repos/$userName/$repository/releases/latest"
-        }
+        // Get the latest stable release
+        // https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#get-the-latest-release
+        // The latest release is the most recent non-prerelease, non-draft release, sorted by the created_at attribute
+        val latestReleaseUrl = "https://api.github.com/repos/$userName/$repository/releases/latest"
 
         val latestRelease = app.get(
             url = latestReleaseUrl,

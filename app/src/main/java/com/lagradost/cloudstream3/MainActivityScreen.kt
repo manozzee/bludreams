@@ -28,10 +28,8 @@ import com.lagradost.cloudstream3.plugins.PluginManager
 import com.lagradost.cloudstream3.ui.settings.ApkUpdater
 import com.lagradost.cloudstream3.ui.settings.GithubReleases
 import com.lagradost.cloudstream3.ui.settings.GithubReleases.APK_CONTENT_TYPE
-import com.lagradost.cloudstream3.ui.settings.GithubReleases.APK_PRERELEASE
 import com.lagradost.cloudstream3.ui.settings.GithubReleases.APK_REPOSITORY
 import com.lagradost.cloudstream3.ui.settings.GithubReleases.APK_USERNAME
-import com.lagradost.cloudstream3.utils.GitInfo.currentCommitHash
 import com.lagradost.cloudstream3.utils.parseMarkdown
 import com.lagradost.cloudstream4.compose.BlackButton
 import com.lagradost.cloudstream4.compose.Screen
@@ -60,12 +58,9 @@ object MainActivityScreen : Screen {
             GithubViewModel(
                 remoteUserName = APK_USERNAME,
                 remoteRepository = APK_REPOSITORY,
-                remotePrereleaseTag = APK_PRERELEASE,
                 remoteContentType = APK_CONTENT_TYPE,
                 versionName = BuildConfig.VERSION_NAME,
-                isPrerelease = false,
                 isDebug = BuildConfig.DEBUG,
-                buildSha = activity.currentCommitHash(),
                 settings = settings,
                 updater = ApkUpdater,
                 repository = GithubReleases,
@@ -161,8 +156,8 @@ object MainActivityScreen : Screen {
                 cancelable = true
                 title = stringResource(
                     R.string.new_update_format,
-                    (state.oldSha ?: BuildConfig.VERSION_NAME),
-                    (state.newSha ?: state.file.displayName)
+                    BuildConfig.VERSION_NAME,
+                    state.file.displayName
                 )
                 body = {
                     Text(

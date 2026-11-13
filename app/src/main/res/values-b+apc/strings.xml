@@ -683,9 +683,6 @@
     <string name="edit_profile_image_hint">ادخل لينك ( عنوان ال URL ) تبع صورة الملف</string>
     <string name="edit_profile_image_success">تم تعديل الصورة بنجاح</string>
     <string name="play_full_series_button">بلّش كل المسلسل</string>
-    <string name="install_prerelease">نزل النسخة التجريبية من الآپ</string>
-    <string name="prerelease_already_installed">أصلًا عندك النسخة التجريبية.</string>
-    <string name="prerelease_install_failed">فشل تنزيل النسخة التجريبية.</string>
     <string name="episode_action_play_mirror">ستعمل مصدر بديل</string>"
     <string name="show_episode_text">كتيبة الحلقة</string>
     <string name="edit_profile_image_error_empty">م لقينا الرابط</string>

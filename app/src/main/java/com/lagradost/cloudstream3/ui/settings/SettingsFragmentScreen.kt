@@ -11,7 +11,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -83,17 +82,13 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CommonActivity.activity
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import androidx.activity.ComponentActivity
 import com.lagradost.cloudstream3.utils.DataStoreHelper.Account
 import com.lagradost.cloudstream3.utils.DataStoreHelper.profileImages
-import com.lagradost.cloudstream3.utils.GitInfo.currentCommitHash
-import com.lagradost.cloudstream3.utils.UIHelper.clipboardHelper
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
-import com.lagradost.cloudstream3.utils.txt
 import com.lagradost.cloudstream4.compose.Screen
 import com.lagradost.cloudstream4.compose.TV
 import com.lagradost.cloudstream4.compose.focusOutline
@@ -108,11 +103,6 @@ import com.mihon.presentation.settings.widget.settingsCard
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
-import java.text.DateFormat
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 object SettingsFragmentScreen : Screen {
     val screens = persistentListOf(
@@ -378,7 +368,6 @@ object SettingsFragmentScreen : Screen {
                                 }
                             )
 
-                            BuildStamp()
                             Spacer(modifier = Modifier.height(110.dp))
                         }
                     }
@@ -542,43 +531,6 @@ object SettingsFragmentScreen : Screen {
     @Composable
     fun SettingsSearch(textFieldState: TextFieldState) {
         com.lagradost.cloudstream3.ui.liquidglass.SettingsSearchBox(textFieldState = textFieldState)
-    }
-
-    @Composable
-    fun BuildStamp() {
-        val (commitHash, buildTimestamp) = remember {
-            val commitHash = activity?.currentCommitHash() ?: ""
-            val buildTimestamp = SimpleDateFormat.getDateTimeInstance(
-                DateFormat.LONG, DateFormat.MEDIUM,
-                Locale.getDefault()
-            ).apply {
-                timeZone = TimeZone.getTimeZone("UTC")
-            }.format(Date(BuildConfig.BUILD_DATE)).replace("UTC", "")
-            commitHash to buildTimestamp
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp, bottom = 8.dp)
-                .clickable {
-                    clipboardHelper(
-                        txt(R.string.extension_version),
-                        "${BuildConfig.VERSION_NAME} $commitHash $buildTimestamp"
-                    )
-                },
-        ) {
-            Text(
-                text = "CloudStream v${BuildConfig.VERSION_NAME}" + if (commitHash.isNotEmpty()) " • $commitHash" else "",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
-                    color = Color.White.copy(alpha = 0.38f),
-                    fontSize = 12.sp,
-                ),
-            )
-        }
     }
 }
 

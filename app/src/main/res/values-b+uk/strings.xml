@@ -702,9 +702,6 @@
     <string name="top_center">Угорі в центрі</string>
     <string name="top_right">Угорі праворуч</string>
     <string name="play_full_series_button">Відтворити весь серіал</string>
-    <string name="install_prerelease">Встановити передрелізну версію</string>
-    <string name="prerelease_already_installed">Передрелізна версія вже встановлена.</string>
-    <string name="prerelease_install_failed">Не вдалося встановити передрелізну версію.</string>
     <string name="show_episode_text">Текст епізоду</string>
     <string name="search_suggestions">Пропозиції пошуку</string>
     <string name="search_suggestions_des">Показувати підказки пошуку під час введення тексту</string>

@@ -646,9 +646,6 @@
     <string name="search_suggestions_des">Zoeksuggesties laten zien tijdens het typen</string>
     <string name="clear_suggestions">Suggesties verwijderen</string>
     <string name="show_cast_in_details">Castpaneel weergeven</string>
-    <string name="install_prerelease">Pre-releaseversie installeren</string>
-    <string name="prerelease_already_installed">Pre-releaseversie is al geïnstaleerd.</string>
-    <string name="prerelease_install_failed">Installatie van de pre-release is mislukt.</string>
     <string name="episode_action_cast_mirror">Schermspiegeling</string>
     <string name="episode_action_play_mirror">Spiegeling spelen</string>"
     <string name="show_rating">Beoordelingslabel</string>

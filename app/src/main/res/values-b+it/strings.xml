@@ -724,9 +724,6 @@
     <string name="top_right">In alto a destra</string>
     <string name="middle_left">In centro a sinistra</string>
     <string name="play_full_series_button">Riproduci serie completa</string>
-    <string name="install_prerelease">Installa la versione pre-release</string>
-    <string name="prerelease_already_installed">La versione pre-release è già installata.</string>
-    <string name="prerelease_install_failed">Impossibile installare la versione pre-release.</string>
     <string name="show_episode_text">Testo dell\'episodio</string>
     <string name="search_suggestions">Suggerimenti per la ricerca</string>
     <string name="search_suggestions_des">Mostra suggerimenti di ricerca durante la digitazione</string>

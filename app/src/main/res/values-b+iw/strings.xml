@@ -698,9 +698,6 @@
     <string name="top_center">למעלה במרכז</string>
     <string name="top_right">למעלה מימין</string>
     <string name="play_full_series_button">נגן את כל הסדרה</string>
-    <string name="install_prerelease">התקן גרסת טרום־הפצה</string>
-    <string name="prerelease_already_installed">גרסת טרום־ההפצה כבר מותקנת.</string>
-    <string name="prerelease_install_failed">התקנת גרסת טרום־ההפצה נכשלה.</string>
     <string name="show_episode_text">טקסט הפרק</string>
     <string name="search_suggestions">הצעות חיפוש</string>
     <string name="search_suggestions_des">הצג הצעות חיפוש בזמן ההקלדה</string>

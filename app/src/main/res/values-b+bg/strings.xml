@@ -690,9 +690,6 @@
     <string name="search_suggestions_des">Показвай предложения за търсене по време на писане</string>
     <string name="clear_suggestions">Изтрий предложения</string>
     <string name="show_cast_in_details">Покажи панела за излъчване</string>
-    <string name="install_prerelease">Инсталирай предварителна версия</string>
-    <string name="prerelease_already_installed">Предварителна версия вече е изтеглена.</string>
-    <string name="prerelease_install_failed">Неуспешна инсталация на предварителната версия.</string>
     <string name="show_rating">Етикет за рейтинг</string>
     <string name="show_episode_text">Текст на епизода</string>
     <string name="video_info">Информация за медията</string>

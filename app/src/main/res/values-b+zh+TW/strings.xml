@@ -663,9 +663,6 @@
     <string name="search_suggestions_des">輸入時顯示搜尋建議</string>
     <string name="clear_suggestions">清除建議</string>
     <string name="show_cast_in_details">顯示投影控制板</string>
-    <string name="install_prerelease">安裝提前發行版</string>
-    <string name="prerelease_already_installed">已安裝提前發行版。</string>
-    <string name="prerelease_install_failed">提前發行版安裝失敗。</string>
     <string name="episode_action_play_mirror">鏡像播放</string>"
     <string name="show_rating">評分標籤</string>
     <string name="show_episode_text">影劇文本</string>

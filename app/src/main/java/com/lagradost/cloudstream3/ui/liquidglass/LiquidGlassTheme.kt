@@ -388,8 +388,8 @@ data class ThemeColorPalette(
     val focusRing: Color,
     val focusBackground: Color,
     val background: Color = Color(0xFF131417),
-    val backgroundElevated: Color = Color(0xFF1B1C21),
-    val backgroundCard: Color = Color(0xFF202227),
+    val backgroundElevated: Color = Color(0xFF2A2D36),
+    val backgroundCard: Color = Color(0xFF21232A),
 )
 
 fun ThemeColorPalette.accentBrush(): Brush =
@@ -397,14 +397,14 @@ fun ThemeColorPalette.accentBrush(): Brush =
 
 fun computeAccentContainerColor(accent: Color, baseBg: Color): Color {
     val isAmoled = baseBg == Color.Black || baseBg.luminance() < 0.005f
-    val containerBase = if (isAmoled) Color(0xFF0C0C0E) else Color(0xFF161619)
-    return accent.copy(alpha = 0.03f).compositeOver(containerBase) // Very soft, low-saturation accent hint
+    val containerBase = if (isAmoled) Color(0xFF14151A) else Color(0xFF21232A)
+    return accent.copy(alpha = 0.07f).compositeOver(containerBase)
 }
 
 fun computeAccentElevatedColor(accent: Color, baseBg: Color): Color {
     val isAmoled = baseBg == Color.Black || baseBg.luminance() < 0.005f
-    val elevatedBase = if (isAmoled) Color(0xFF111113) else Color(0xFF1C1C20)
-    return accent.copy(alpha = 0.05f).compositeOver(elevatedBase) // Elevated surfaces
+    val elevatedBase = if (isAmoled) Color(0xFF1E2027) else Color(0xFF2A2D36)
+    return accent.copy(alpha = 0.10f).compositeOver(elevatedBase)
 }
 
 object ThemeColors {
@@ -417,8 +417,8 @@ object ThemeColors {
         focusRing = Color(0xFFDC2626),
         focusBackground = Color(0x33991B1B),
         background = Color(0xFF131417),
-        backgroundElevated = Color(0xFF1B1C21),
-        backgroundCard = Color(0xFF202227),
+        backgroundElevated = Color(0xFF2A2D36),
+        backgroundCard = Color(0xFF21232A),
     )
 
     val AuraBrass = ThemeColorPalette(
@@ -430,8 +430,8 @@ object ThemeColors {
         focusRing = Color(0xFFD9A74A),
         focusBackground = Color(0x33B98A28),
         background = Color(0xFF131417),
-        backgroundElevated = Color(0xFF1B1C21),
-        backgroundCard = Color(0xFF202227),
+        backgroundElevated = Color(0xFF2A2D36),
+        backgroundCard = Color(0xFF21232A),
     )
 
     val SmokedCognac = ThemeColorPalette(
@@ -443,8 +443,8 @@ object ThemeColors {
         focusRing = Color(0xFFBC4712),
         focusBackground = Color(0x339A3412),
         background = Color(0xFF131417),
-        backgroundElevated = Color(0xFF1B1C21),
-        backgroundCard = Color(0xFF202227),
+        backgroundElevated = Color(0xFF2A2D36),
+        backgroundCard = Color(0xFF21232A),
     )
 
     val ObsidianPine = ThemeColorPalette(
@@ -456,8 +456,8 @@ object ThemeColors {
         focusRing = Color(0xFF047857),
         focusBackground = Color(0x33065F46),
         background = Color(0xFF131417),
-        backgroundElevated = Color(0xFF1B1C21),
-        backgroundCard = Color(0xFF202227),
+        backgroundElevated = Color(0xFF2A2D36),
+        backgroundCard = Color(0xFF21232A),
     )
 
     val FincherTeal = ThemeColorPalette(
@@ -469,8 +469,8 @@ object ThemeColors {
         focusRing = Color(0xFF0D7972),
         focusBackground = Color(0x330E7490),
         background = Color(0xFF131417),
-        backgroundElevated = Color(0xFF1B1C21),
-        backgroundCard = Color(0xFF202227),
+        backgroundElevated = Color(0xFF2A2D36),
+        backgroundCard = Color(0xFF21232A),
     )
 
     val MidnightLapis = ThemeColorPalette(
@@ -482,8 +482,8 @@ object ThemeColors {
         focusRing = Color(0xFF3B82F6),
         focusBackground = Color(0x331E40AF),
         background = Color(0xFF131417),
-        backgroundElevated = Color(0xFF1B1C21),
-        backgroundCard = Color(0xFF202227),
+        backgroundElevated = Color(0xFF2A2D36),
+        backgroundCard = Color(0xFF21232A),
     )
 
     val NocturneViolet = ThemeColorPalette(
@@ -495,8 +495,8 @@ object ThemeColors {
         focusRing = Color(0xFF7022AC),
         focusBackground = Color(0x33581C87),
         background = Color(0xFF131417),
-        backgroundElevated = Color(0xFF1B1C21),
-        backgroundCard = Color(0xFF202227),
+        backgroundElevated = Color(0xFF2A2D36),
+        backgroundCard = Color(0xFF21232A),
     )
 
     // Backward-compatible alias for default theme
@@ -537,14 +537,14 @@ internal fun defaultLiquidGlassThemeTokens(
 ): LiquidGlassThemeTokens {
     val background = if (amoled) Color.Black else palette.background
     val textPrimary = Color(0xFFF5F7F8)
-    val textSecondary = Color(0xFFB8BEC5)
-    val textMuted = Color(0xFF969CA3)
+    val textSecondary = Color(0xFFC2C8D0)
+    val textMuted = Color(0xFFA4AAB3)
     val surface = palette.backgroundElevated
     val surfaceCard = palette.backgroundCard
     val accent = palette.secondary
     val accentStrong = palette.secondaryVariant
-    val borderSubtle = if (amoled) Color(0x22FFFFFF) else Color(0xFF2E3138).copy(alpha = 0.55f)
-    val borderDefault = if (amoled) Color(0x33FFFFFF) else Color(0xFF2E3138)
+    val borderSubtle = if (amoled) Color(0x2EFFFFFF) else Color(0xFF363A45).copy(alpha = 0.72f)
+    val borderDefault = if (amoled) Color(0x47FFFFFF) else Color(0xFF414654)
     val overlayScrim = Color.Black.copy(alpha = LiquidGlassTokens.Opacity.overlayMedium)
 
     return LiquidGlassThemeTokens(
@@ -570,7 +570,7 @@ internal fun defaultLiquidGlassThemeTokens(
             focusBackground = palette.focusBackground,
             borderSubtle = borderSubtle,
             borderDefault = borderDefault,
-            borderStrong = Color(0xFF3A4040),
+            borderStrong = if (amoled) Color(0x5CFFFFFF) else Color(0xFF4E5464),
             borderFocus = palette.focusRing,
             borderSelected = accent.copy(alpha = LiquidGlassTokens.Opacity.strong),
             success = Color(0xFF66BB6A),
@@ -583,8 +583,8 @@ internal fun defaultLiquidGlassThemeTokens(
             overlayPressed = Color.White.copy(alpha = LiquidGlassTokens.Opacity.pressed),
             overlaySelected = Color.White.copy(alpha = LiquidGlassTokens.Opacity.selected),
             overlayDisabled = Color.Black.copy(alpha = LiquidGlassTokens.Opacity.disabled),
-            shimmer = Color.White.copy(alpha = 0.10f),
-            skeleton = Color.White.copy(alpha = 0.06f),
+            shimmer = Color.White.copy(alpha = 0.14f),
+            skeleton = Color.White.copy(alpha = 0.09f),
             playerControlsBackground = Color.Black.copy(alpha = 0.72f),
             playerControlsForeground = Color.White,
             playerTimelineTrack = Color.White.copy(alpha = 0.30f),
@@ -823,10 +823,13 @@ private fun buildColorScheme(palette: ThemeColorPalette, amoled: Boolean = false
     surface = palette.backgroundElevated,
     onSurface = Color(0xFFF5F7F8),
     surfaceVariant = palette.backgroundCard,
-    onSurfaceVariant = Color(0xFF969CA3),
+    onSurfaceVariant = Color(0xFFA4AAB3),
+    surfaceContainerLow = palette.backgroundCard,
     surfaceContainer = palette.backgroundCard,
     surfaceContainerHigh = palette.backgroundElevated,
-    outline = if (amoled) Color(0x33FFFFFF) else Color(0xFF2E3138),
+    surfaceContainerHighest = palette.backgroundElevated,
+    outline = if (amoled) Color(0x47FFFFFF) else Color(0xFF414654),
+    outlineVariant = if (amoled) Color(0x2EFFFFFF) else Color(0xFF323642),
     error = Color(0xFFE36A8A),
     onError = Color(0xFFFCE5EC),
 )

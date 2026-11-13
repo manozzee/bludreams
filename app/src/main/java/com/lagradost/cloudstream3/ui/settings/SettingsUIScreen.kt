@@ -1,27 +1,49 @@
 package com.lagradost.cloudstream3.ui.settings
 
 import android.os.Build
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
-import androidx.fragment.app.FragmentActivity
-import com.lagradost.cloudstream3.ui.poster.PosterCardStyleRepository
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.integerArrayResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import com.lagradost.cloudstream3.ui.poster.PosterCardStyleRepository
+import com.lagradost.cloudstream4.theme.AppFont
+import com.mihon.presentation.settings.widget.LocalGroupPosition
+import com.mihon.presentation.settings.widget.settingsCard
 import com.lagradost.cloudstream3.CommonActivity
 import com.lagradost.cloudstream3.CommonActivity.activity
 import com.lagradost.cloudstream3.MainActivity
@@ -100,6 +122,12 @@ object SettingsUIScreen : SearchableSettings {
             Preference.PreferenceGroup(
                 title = stringResource(R.string.pref_category_looks),
                 preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.CustomPreference(
+                        title = "App Icon",
+                        content = {
+                            AppIconPickerCard()
+                        },
+                    ),
                     Preference.PreferenceItem.ListPreference(
                         preference = settings.ui.primaryColor,
                         icon = painterResource(R.drawable.colors_24px),
@@ -269,5 +297,117 @@ object SettingsUIScreen : SearchableSettings {
                 )
             )
         )
+    }
+
+    @Composable
+    private fun AppIconPickerCard() {
+        val context = LocalContext.current
+        val activeIcon = rememberActiveAppIcon()
+        val groupPosition = LocalGroupPosition.current
+
+        Column(
+            modifier = Modifier
+                .settingsCard(groupPosition)
+                .padding(vertical = 14.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+            ) {
+                Text(
+                    text = "App Icon",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = AppFont.outfit,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                        color = Color.White,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Current: ${activeIcon.label}",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = AppFont.figtree,
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.65f),
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                items(
+                    items = AppIconRegistry.icons,
+                    key = { it.id },
+                ) { option ->
+                    val isSelected = option.id == activeIcon.id
+                    val borderColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            Color.White.copy(alpha = 0.14f)
+                        },
+                        label = "appIconBorderColor",
+                    )
+                    val borderWidth by animateDpAsState(
+                        targetValue = if (isSelected) 2.5.dp else 1.dp,
+                        label = "appIconBorderWidth",
+                    )
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable {
+                                AppIconRegistry.selectIcon(context, option.id)
+                            }
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .border(
+                                    width = borderWidth,
+                                    color = borderColor,
+                                    shape = CircleShape,
+                                )
+                                .padding(if (isSelected) 4.dp else 3.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MergedAppIconPreview(
+                                icon = option,
+                                modifier = Modifier.fillMaxSize(),
+                                foregroundInset = 3.dp,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = option.label,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = if (isSelected) AppFont.outfit else AppFont.figtree,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                fontSize = 12.sp,
+                            ),
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                Color.White.copy(alpha = 0.72f)
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
     }
 }

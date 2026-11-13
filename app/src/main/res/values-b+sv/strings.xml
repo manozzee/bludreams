@@ -707,9 +707,6 @@
     <string name="search_suggestions_des">Visa sökförslag medan du skriver</string>
     <string name="clear_suggestions">Rensa förslag</string>
     <string name="show_cast_in_details">Visa skådespelarpanelen</string>
-    <string name="install_prerelease">Installera förhandsversionen</string>
-    <string name="prerelease_already_installed">Förhandsversionen är redan installerad.</string>
-    <string name="prerelease_install_failed">Misslyckades med att installera förhandsversionen.</string>
     <string name="episode_action_play_mirror">Spela mirror</string>"
     <string name="show_rating">Graderingstitel</string>
     <string name="show_episode_text">Avsnitt Text</string>

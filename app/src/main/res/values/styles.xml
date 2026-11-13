@@ -130,10 +130,10 @@
     </style>
 
     <style name="AmoledMode">
-        <item name="primaryGrayBackground">#0E0E10</item>
+        <item name="primaryGrayBackground">#14151A</item>
         <item name="primaryBlackBackground">@color/black</item>
-        <item name="iconGrayBackground">#18181C</item>
-        <item name="boxItemBackground">#0E0E10</item>
+        <item name="iconGrayBackground">#1E2027</item>
+        <item name="boxItemBackground">#14151A</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
         <item name="textColor">@color/textColor</item>
         <item name="grayTextColor">@color/grayTextColor</item>
@@ -190,9 +190,9 @@
         <item name="colorAccent">#DC2626</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#DC2626</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 
@@ -203,9 +203,9 @@
         <item name="colorAccent">#DC2626</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#DC2626</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 
@@ -216,9 +216,9 @@
         <item name="colorAccent">#D9A74A</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#D9A74A</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 
@@ -229,9 +229,9 @@
         <item name="colorAccent">#BC4712</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#BC4712</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 
@@ -242,9 +242,9 @@
         <item name="colorAccent">#047857</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#047857</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 
@@ -255,9 +255,9 @@
         <item name="colorAccent">#0D7972</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#0D7972</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 
@@ -268,9 +268,9 @@
         <item name="colorAccent">#3B82F6</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#3B82F6</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 
@@ -281,9 +281,9 @@
         <item name="colorAccent">#7022AC</item>
         <item name="colorOnPrimary">@color/whiteText</item>
         <item name="android:colorAccent">#7022AC</item>
-        <item name="primaryGrayBackground">#17171A</item>
-        <item name="boxItemBackground">#17171A</item>
-        <item name="iconGrayBackground">#222328</item>
+        <item name="primaryGrayBackground">#21232A</item>
+        <item name="boxItemBackground">#21232A</item>
+        <item name="iconGrayBackground">#2A2D36</item>
         <item name="colorSurfaceVariant">?attr/primaryGrayBackground</item>
     </style>
 

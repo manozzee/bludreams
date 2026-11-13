@@ -466,9 +466,6 @@
     <string name="search_suggestions">Návrhy vyhľadávania</string>
     <string name="search_suggestions_des">Zobraziť návrhy vyhľadávania pri písaní</string>
     <string name="clear_suggestions">Vyčistiť Návrhy</string>
-    <string name="install_prerelease">Nainštalujte pre-release verziu</string>
-    <string name="prerelease_already_installed">Pre-release je už nainštalovaný.</string>
-    <string name="prerelease_install_failed">Nepodarilo sa nainštalovať pre-release.</string>
     <string name="unsupported_error">Nepodporovaná chyba</string>
     <string name="show_episode_text">Text Epizódy</string>
     <string name="auth_locally">Lokálna verifikácia</string>

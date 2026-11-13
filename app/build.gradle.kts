@@ -87,15 +87,23 @@ android {
     signingConfigs {
         // We just use SIGNING_KEY_ALIAS here since it won't change
         // so won't kill the configuration cache.
-        if (System.getenv("SIGNING_KEY_ALIAS") != null) {
-            create("release") {
+        val keyAliasEnv = System.getenv("SIGNING_KEY_ALIAS")
+        if (!keyAliasEnv.isNullOrBlank()) {
+            val keystorePathEnv = System.getenv("SIGNING_KEYSTORE_PATH")
+            val releaseStoreFile: File? = if (!keystorePathEnv.isNullOrBlank()) {
+                File(keystorePathEnv).takeIf { it.isFile }
+            } else {
                 val tmpFilePath = System.getProperty("user.home") + "/work/_temp/keystore/"
-                val releaseStoreFile: File? = File(tmpFilePath).listFiles()?.first()
+                File(tmpFilePath).listFiles()?.firstOrNull()
+            }
 
-                storeFile = releaseStoreFile?.let { file(it) }
-                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            if (releaseStoreFile != null && releaseStoreFile.exists()) {
+                create("release") {
+                    storeFile = releaseStoreFile
+                    storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                    keyAlias = keyAliasEnv
+                    keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                }
             }
         }
     }

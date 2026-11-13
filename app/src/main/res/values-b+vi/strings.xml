@@ -720,9 +720,6 @@
     <string name="search_suggestions">Gợi ý tìm kiếm</string>
     <string name="search_suggestions_des">Hiển thị gợi ý tìm kiếm khi đang nhập</string>
     <string name="clear_suggestions">Xóa gợi ý</string>
-    <string name="install_prerelease">Cài đặt phiên bản phát hành trước</string>
-    <string name="prerelease_already_installed">Bản phát hành trước đã được cài đặt.</string>
-    <string name="prerelease_install_failed">Cài đặt bản phát hành trước thất bại.</string>
     <string name="show_episode_text">Tập</string>
     <string name="extra_brightness_settings_des">Bật bộ lọc độ sáng khi độ sáng màn hình vượt quá 100%</string>
     <string name="show_cast_in_details">Hiển thị bảng dàn diễn viên</string>

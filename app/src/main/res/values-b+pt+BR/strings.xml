@@ -717,9 +717,6 @@
     <string name="top_right">Superior direito</string>
     <string name="play_full_series_button">Assistir à série completa</string>
     <string name="resolution_and_name">Resolução e nome</string>
-    <string name="prerelease_install_failed">Falha ao instalar a versão antecipada.</string>
-    <string name="prerelease_already_installed">Versão antecipada instalada.</string>
-    <string name="install_prerelease">Instalar versão antecipada</string>
     <string name="show_episode_text">Episódio Text</string>
     <string name="download_queue">Fila de download</string>
     <string name="queue_empty_message">Não há itens na fila para download.</string>

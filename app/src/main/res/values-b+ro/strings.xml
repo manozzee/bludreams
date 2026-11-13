@@ -638,7 +638,4 @@
     <string name="download_time_left_min_sec_format" formatted="true">%1$dm %2$ds</string>
     <string name="download_time_left_sec_format" formatted="true">%1$ds</string>
     <string name="play_full_series_button">Redă întregul serial</string>
-    <string name="install_prerelease">Instalează versiunea preliminară</string>
-    <string name="prerelease_already_installed">Versiunea preliminară este deja instalată.</string>
-    <string name="prerelease_install_failed">Instalarea versiunii preliminare a eșuat.</string>
 </resources>

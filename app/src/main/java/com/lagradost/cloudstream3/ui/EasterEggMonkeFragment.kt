@@ -12,10 +12,13 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import coil3.load
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.databinding.FragmentEasterEggMonkeBinding
+import com.lagradost.cloudstream3.ui.settings.AppIconRegistry
 import com.lagradost.cloudstream3.utils.UIHelper.hideSystemUI
 import com.lagradost.cloudstream3.utils.UIHelper.showSystemUI
+import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -27,21 +30,24 @@ class EasterEggMonkeFragment : BaseFragment<FragmentEasterEggMonkeBinding>(
 ) {
 
     // planet of monks
-    private val monkeys: List<Int> = listOf(
-        R.drawable.monke_benene,
-        R.drawable.monke_burrito,
-        R.drawable.monke_coco,
-        R.drawable.monke_cookie,
-        R.drawable.monke_flusdered,
-        R.drawable.monke_funny,
-        R.drawable.monke_like,
-        R.drawable.monke_party,
-        R.drawable.monke_sob,
-        R.drawable.monke_drink,
-        R.drawable.benene,
-        R.drawable.ic_launcher_foreground,
-        R.drawable.quick_novel_icon,
-    )
+    private fun currentMonkeys(): List<Int> {
+        context?.let { AppIconRegistry.ensureLoaded(it) }
+        return listOf(
+            R.drawable.monke_benene,
+            R.drawable.monke_burrito,
+            R.drawable.monke_coco,
+            R.drawable.monke_cookie,
+            R.drawable.monke_flusdered,
+            R.drawable.monke_funny,
+            R.drawable.monke_like,
+            R.drawable.monke_party,
+            R.drawable.monke_sob,
+            R.drawable.monke_drink,
+            R.drawable.benene,
+            AppIconRegistry.currentIcon.value.foregroundRes,
+            R.drawable.quick_novel_icon,
+        )
+    }
 
     private val activeMonkeys = mutableListOf<ImageView>()
     private var spawningJob: Job? = null
@@ -60,8 +66,12 @@ class EasterEggMonkeFragment : BaseFragment<FragmentEasterEggMonkeBinding>(
     }
 
     private fun spawnMonkey(binding: FragmentEasterEggMonkeBinding) {
-        val newMonkey = ImageView(context ?: return).apply {
-            setImageResource(monkeys.random())
+        val ctx = context ?: return
+        val activeIcon = AppIconRegistry.currentIcon.value
+        val pickedDrawable = currentMonkeys().random()
+        val isLargeCustomIcon = pickedDrawable == activeIcon.foregroundRes
+
+        val newMonkey = ImageView(ctx).apply {
             isVisible = true
         }
 
@@ -69,16 +79,30 @@ class EasterEggMonkeFragment : BaseFragment<FragmentEasterEggMonkeBinding>(
         newMonkey.scaleX = initialScale
         newMonkey.scaleY = initialScale
 
-        newMonkey.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-        val monkeyW = newMonkey.measuredWidth * initialScale
-        val monkeyH = newMonkey.measuredHeight * initialScale
+        val monkeyW: Float
+        val monkeyH: Float
+        val layoutParams: FrameLayout.LayoutParams
+        if (isLargeCustomIcon) {
+            val sizePx = 72.toPx
+            newMonkey.load(pickedDrawable)
+            monkeyW = sizePx * initialScale
+            monkeyH = sizePx * initialScale
+            layoutParams = FrameLayout.LayoutParams(sizePx, sizePx)
+        } else {
+            newMonkey.setImageResource(pickedDrawable)
+            newMonkey.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            monkeyW = newMonkey.measuredWidth * initialScale
+            monkeyH = newMonkey.measuredHeight * initialScale
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+            )
+        }
 
         newMonkey.x = Random.nextFloat() * (binding.frame.width.toFloat() - monkeyW)
         newMonkey.y = Random.nextFloat() * (binding.frame.height.toFloat() - monkeyH)
 
-        binding.frame.addView(newMonkey, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
-        ))
+        binding.frame.addView(newMonkey, layoutParams)
 
         activeMonkeys.add(newMonkey)
 

@@ -722,9 +722,6 @@
     <string name="search_suggestions_des">عرض اقتراحات البحث أثناء الكتابة</string>
     <string name="clear_suggestions">مسح الاقتراحات</string>
     <string name="show_cast_in_details">عرض لوحة فريق التمثيل</string>
-    <string name="install_prerelease">تثبيت الإصدار التجريبي</string>
-    <string name="prerelease_already_installed">تم تثبيت الإصدار التجريبي بالفعل.</string>
-    <string name="prerelease_install_failed">فشل تثبيت الإصدار التجريبي.</string>
     <string name="show_episode_text">نص الحلقة</string>
     <string name="video_info">معلومات الوسائط</string>
     <string name="source_name">اسم المصدر</string>

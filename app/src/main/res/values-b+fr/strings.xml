@@ -703,9 +703,6 @@
     <string name="top_center">En haut au centre</string>
     <string name="top_right">En haut à droite</string>
     <string name="play_full_series_button">Jouer la série complète</string>
-    <string name="install_prerelease">Installer la version préliminaire</string>
-    <string name="prerelease_already_installed">La version préliminaire est déjà installée.</string>
-    <string name="prerelease_install_failed">L\'installation de la version préliminaire a échouée.</string>
     <string name="show_episode_text">Texte de l\'épisode</string>
     <string name="search_suggestions">Suggestions de recherche</string>
     <string name="search_suggestions_des">Afficher des suggestions de recherche pendant la saisie</string>

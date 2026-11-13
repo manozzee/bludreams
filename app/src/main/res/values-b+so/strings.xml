@@ -504,6 +504,4 @@
     <string name="show_player_metadata_overlay">Muuji xogta dulsaaran muuqaalka</string>
     <string name="show_cast_in_details">Soo bandhig guddiga dhibidda</string>
     <string name="automatic_plugin_download_mode_title">Dooro habka loo kala saarayo soo dejinta plugins-ka</string>
-    <string name="install_prerelease">Soo deji nooca hordhaca ah</string>
-    <string name="prerelease_already_installed">Nooca hordhaca ah horey ayaa loo soo dejiyay.</string>
 </resources>

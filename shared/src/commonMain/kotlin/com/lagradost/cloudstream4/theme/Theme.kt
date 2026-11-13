@@ -61,10 +61,10 @@ fun modeToTheme(mode: CloudStreamThemeMode, primaryColor: CloudStreamPrimaryColo
             else -> primaryColor.color
         }
         val isAmoled = mode == CloudStreamThemeMode.Amoled
-        val containerBase = if (isAmoled) Color(0xFF0C0C0E) else Color(0xFF161619)
-        val elevatedBase = if (isAmoled) Color(0xFF111113) else Color(0xFF1C1C20)
-        val accentContainer = accent.copy(alpha = 0.03f).compositeOver(containerBase)
-        val accentElevated = accent.copy(alpha = 0.05f).compositeOver(elevatedBase)
+        val containerBase = if (isAmoled) Color(0xFF14151A) else Color(0xFF21232A)
+        val elevatedBase = if (isAmoled) Color(0xFF1E2027) else Color(0xFF2A2D36)
+        val accentContainer = accent.copy(alpha = 0.07f).compositeOver(containerBase)
+        val accentElevated = accent.copy(alpha = 0.10f).compositeOver(elevatedBase)
         base.copy(
             primary = accent,
             surfaceVariant = accentContainer,
@@ -82,20 +82,29 @@ private fun CloudStreamColorScheme.toMaterial3ColorScheme() = if (isLight) {
         background = background,
         surface = surface,
         surfaceVariant = surfaceVariant,
+        surfaceContainerLow = surfaceContainer,
         surfaceContainer = surfaceContainer,
+        surfaceContainerHigh = surface,
+        surfaceContainerHighest = surface,
         onBackground = onBackground,
         onSurface = onBackground,
         onSurfaceVariant = onSurfaceVariant,
         onPrimary = Color.White,
     )
 } else {
+    val isAmoled = background == Color.Black
     darkColorScheme(
         primary = primary,
         primaryContainer = surfaceVariant,
         background = background,
         surface = surface,
         surfaceVariant = surfaceVariant,
+        surfaceContainerLow = surfaceContainer,
         surfaceContainer = surfaceContainer,
+        surfaceContainerHigh = surface,
+        surfaceContainerHighest = surface,
+        outline = if (isAmoled) Color(0x47FFFFFF) else Color(0xFF414654),
+        outlineVariant = if (isAmoled) Color(0x2EFFFFFF) else Color(0xFF323642),
         onBackground = onBackground,
         onSurface = onBackground,
         onSurfaceVariant = onSurfaceVariant,

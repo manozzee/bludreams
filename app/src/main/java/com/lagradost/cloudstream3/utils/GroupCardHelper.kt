@@ -22,14 +22,14 @@ enum class GroupPosition {
 }
 
 object GroupCardHelper {
-    const val CARD_BACKGROUND_COLOR = 0xFF17171A.toInt()
-    const val APP_BACKGROUND_COLOR = 0xFF0F0F10.toInt()
-    const val ICON_TILE_BACKGROUND_COLOR = 0xFF222328.toInt()
+    const val CARD_BACKGROUND_COLOR = 0xFF21232A.toInt()
+    const val APP_BACKGROUND_COLOR = 0xFF131417.toInt()
+    const val ICON_TILE_BACKGROUND_COLOR = 0xFF2A2D36.toInt()
 
     fun getAccentContainerColor(context: Context): Int {
         val accent = context.colorFromAttribute(R.attr.colorPrimary)
         val pureBlack = CommonActivity.isPureBlack(context)
-        val base = if (pureBlack) Color.BLACK else 0xFF101012.toInt()
+        val base = if (pureBlack) Color.BLACK else 0xFF131417.toInt()
         val composeAccent = androidx.compose.ui.graphics.Color(accent)
         val composeBase = androidx.compose.ui.graphics.Color(base)
         val container = com.lagradost.cloudstream3.ui.liquidglass.computeAccentContainerColor(composeAccent, composeBase)
