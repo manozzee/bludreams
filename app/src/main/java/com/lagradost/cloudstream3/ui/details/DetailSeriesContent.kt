@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,18 +43,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import com.lagradost.cloudstream3.ui.liquidglass.CircularActionButton
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.DubStatus
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.mvvm.Resource
-import com.lagradost.cloudstream3.ui.home.AnimatedWatchedBadge
 import com.lagradost.cloudstream3.ui.home.PosterProgressBar
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTokens
+import com.lagradost.cloudstream3.ui.liquidglass.liquidGlass
+import com.lagradost.cloudstream3.ui.liquidglass.liquidGlassTypeScale
 import com.lagradost.cloudstream3.ui.poster.CardDepthSurface
 import com.lagradost.cloudstream3.ui.poster.cardDepth
 import com.lagradost.cloudstream3.ui.result.EpisodeRange
@@ -86,13 +93,46 @@ fun DetailEpisodesHeader(
     onBatchDownloadClick: (List<ResultEpisode>) -> Unit,
     onBatchDownloadLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    showLayoutToggle: Boolean = true,
+    horizontalPadding: Dp = 20.dp,
+    topRowTrailingContent: (@Composable () -> Unit)? = null,
+    elevatedGlassContrast: Boolean = false,
 ) {
+    val hasSeasons = seasonOptions.size > 1
+    val hasDubOptions = dubOptions.size > 1
+    val hasRangeOptions = rangeOptions.size > 1
+    val headingColor = if (elevatedGlassContrast) MaterialTheme.liquidGlass.colors.textPrimary else Color(0xFFF5F5F7)
+    val mutedCountColor = if (elevatedGlassContrast) {
+        MaterialTheme.liquidGlass.colors.textMuted.copy(alpha = 0.85f)
+    } else {
+        Color(0xFF8E8E93)
+    }
+    val actionTintColor = if (elevatedGlassContrast) {
+        MaterialTheme.liquidGlass.colors.textSecondary.copy(alpha = 0.88f)
+    } else {
+        Color(0xFFB0B0B8)
+    }
+    val inactiveChipTextColor = if (elevatedGlassContrast) {
+        MaterialTheme.liquidGlass.colors.textMuted.copy(alpha = 0.85f)
+    } else {
+        Color(0xFF8E8E93)
+    }
+    val activeChipTextColor = if (elevatedGlassContrast) {
+        MaterialTheme.liquidGlass.colors.textPrimary
+    } else {
+        Color(0xFFF5F5F7)
+    }
+    val cleanCount = remember(episodesCountText) {
+        episodesCountText?.let { raw ->
+            Regex("\\d+").find(raw)?.value ?: raw.trim()
+        }
+    }
+
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // 1. Season Selector Chips
-        if (seasonOptions.size > 1) {
+        // Tier 1: Horizontal Season Pills (no section header)
+        if (hasSeasons) {
             val seasonKey = remember(seasonOptions) { seasonOptions.firstOrNull()?.seasonNumber?.toString() ?: "" }
             val seasonListState = rememberSaveable(
                 seasonKey,
@@ -100,121 +140,245 @@ fun DetailEpisodesHeader(
             ) {
                 LazyListState()
             }
-            LazyRow(
-                state = seasonListState,
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                items(seasonOptions, key = { "season_${it.seasonNumber}_${it.label}" }) { option ->
-                    val isSelected = option.label == selectedSeasonLabel
-                    DetailFilterPill(
-                        label = option.label,
-                        selected = isSelected,
-                        onClick = { onSeasonSelected(option.seasonNumber) },
-                    )
+                LazyRow(
+                    state = seasonListState,
+                    modifier = if (topRowTrailingContent != null) Modifier.weight(1f) else Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(
+                        start = horizontalPadding,
+                        end = if (topRowTrailingContent != null) {
+                            if (elevatedGlassContrast) LiquidGlassTokens.Space.s6 else 8.dp
+                        } else {
+                            horizontalPadding
+                        },
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        if (elevatedGlassContrast) LiquidGlassTokens.Space.s6 else 8.dp,
+                    ),
+                ) {
+                    items(seasonOptions, key = { "season_${it.seasonNumber}_${it.label}" }) { option ->
+                        val isSelected = option.label == selectedSeasonLabel
+                        SeasonGlassPill(
+                            label = option.label,
+                            selected = isSelected,
+                            onClick = { onSeasonSelected(option.seasonNumber) },
+                            elevatedGlassContrast = elevatedGlassContrast,
+                        )
+                    }
+                }
+                if (topRowTrailingContent != null) {
+                    Box(modifier = Modifier.padding(end = horizontalPadding)) {
+                        topRowTrailingContent()
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s10 else 14.dp))
         }
 
-        // 2. Dub/Sub + Episode Range Chips
-        if (dubOptions.size > 1 || rangeOptions.size > 1) {
-            val filterKey = remember(dubOptions, rangeOptions) {
-                "${dubOptions.firstOrNull()?.label}_${rangeOptions.firstOrNull()?.label}"
-            }
-            val filterListState = rememberSaveable(
-                filterKey,
-                saver = LazyListState.Saver,
-            ) {
-                LazyListState()
-            }
-            LazyRow(
-                state = filterListState,
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(dubOptions, key = { "dub_${it.status.name}" }) { dub ->
-                    val isSelected = dub.label == selectedDubLabel
-                    DetailFilterPill(
-                        label = dub.label,
-                        selected = isSelected,
-                        isAccent = true,
-                        onClick = { onDubSelected(dub.status) },
-                    )
-                }
-                items(rangeOptions, key = { "range_${it.range.startIndex}_${it.label}" }) { rangeOpt ->
-                    val isSelected = rangeOpt.label == selectedRangeLabel
-                    DetailFilterPill(
-                        label = rangeOpt.label,
-                        selected = isSelected,
-                        onClick = { onRangeSelected(rangeOpt.range) },
-                    )
-                }
-            }
-        }
-
-        // 3. Episodes Header Row (Title + Count + Sort + Batch Download + Layout Toggle)
+        // Tier 2: Episodes Header + Muted Count + Borderless Actions
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = stringResource(R.string.episodes),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Normal,
-                )
-                if (!episodesCountText.isNullOrBlank()) {
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = Color.White.copy(alpha = 0.08f),
-                    ) {
-                        Text(
-                            text = episodesCountText,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = if (elevatedGlassContrast) {
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontSize = LiquidGlassTokens.Type.bodyApp,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
                         )
-                    }
+                    } else {
+                        MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    },
+                    color = headingColor,
+                )
+                if (!cleanCount.isNullOrBlank()) {
+                    Text(
+                        text = cleanCount,
+                        style = if (elevatedGlassContrast) {
+                            MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
+                        } else {
+                            MaterialTheme.typography.labelLarge.copy(
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        },
+                        color = mutedCountColor,
+                        modifier = Modifier.padding(
+                            start = if (elevatedGlassContrast) LiquidGlassTokens.Space.s6 else 8.dp,
+                        ),
+                    )
                 }
             }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(
+                    if (elevatedGlassContrast) LiquidGlassTokens.Space.s4 else 6.dp,
+                ),
             ) {
                 if (hasSortOptions) {
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = Color.White.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .clickable(onClick = onSortClick),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Sort,
-                                contentDescription = "Sort Episodes",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp),
+                            .height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s28 else 34.dp)
+                            .clip(
+                                RoundedCornerShape(
+                                    if (elevatedGlassContrast) LiquidGlassTokens.Radius.md else 8.dp,
+                                ),
                             )
-                            if (!selectedSortLabel.isNullOrBlank()) {
+                            .clickable(onClick = onSortClick)
+                            .padding(
+                                horizontal = if (elevatedGlassContrast) LiquidGlassTokens.Space.s6 else 8.dp,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(
+                            if (elevatedGlassContrast) LiquidGlassTokens.Space.s4 else 4.dp,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                            contentDescription = "Sort Episodes",
+                            tint = actionTintColor,
+                            modifier = Modifier.size(
+                                if (elevatedGlassContrast) LiquidGlassTokens.Space.s14 else 16.dp,
+                            ),
+                        )
+                        if (!selectedSortLabel.isNullOrBlank()) {
+                            Text(
+                                text = selectedSortLabel,
+                                style = if (elevatedGlassContrast) {
+                                    MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
+                                } else {
+                                    MaterialTheme.typography.labelMedium.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                },
+                                color = actionTintColor,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+
+                if (hasDownloadSupport && episodesList.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .combinedClickable(
+                                onClick = { onBatchDownloadClick(episodesList) },
+                                onLongClick = onBatchDownloadLongClick,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download All",
+                            tint = Color(0xFFB0B0B8),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+
+                if (showLayoutToggle) {
+                    // Toggle between Horizontal Episode Carousel vs Vertical Episode List
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onToggleEpisodeLayoutStyle),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (episodeLayoutStyle == EpisodeLayoutStyle.LIST) {
+                                Icons.Rounded.ViewAgenda
+                            } else {
+                                Icons.Rounded.GridView
+                            },
+                            contentDescription = "Switch Episode Layout",
+                            tint = Color(0xFFB0B0B8),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+
+                if (!hasSeasons && topRowTrailingContent != null) {
+                    topRowTrailingContent()
+                }
+            }
+        }
+
+        // Tier 3: Grouped Sub / Dub Segmented Toggle & Episode Range Filter Bar
+        if (hasDubOptions || hasRangeOptions) {
+            Spacer(modifier = Modifier.height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s8 else 10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = horizontalPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (hasDubOptions) {
+                    Row(
+                        modifier = Modifier
+                            .height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s28 else 30.dp)
+                            .clip(
+                                RoundedCornerShape(
+                                    if (elevatedGlassContrast) LiquidGlassTokens.Radius.md else 8.dp,
+                                ),
+                            )
+                            .background(Color.White.copy(alpha = if (elevatedGlassContrast) 0.10f else 0.06f))
+                            .padding(if (elevatedGlassContrast) LiquidGlassTokens.Space.s2 else 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        dubOptions.forEach { dub ->
+                            val isSelected = dub.label == selectedDubLabel
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .clip(
+                                        RoundedCornerShape(
+                                            if (elevatedGlassContrast) LiquidGlassTokens.Radius.sm else 6.dp,
+                                        ),
+                                    )
+                                    .background(
+                                        if (isSelected) {
+                                            Color.White.copy(alpha = if (elevatedGlassContrast) 0.22f else 0.16f)
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                    )
+                                    .clickable { onDubSelected(dub.status) }
+                                    .padding(
+                                        horizontal = if (elevatedGlassContrast) LiquidGlassTokens.Space.s8 else 10.dp,
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
                                 Text(
-                                    text = selectedSortLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
+                                    text = dub.label,
+                                    style = if (elevatedGlassContrast) {
+                                        MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                        )
+                                    } else {
+                                        MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                        )
+                                    },
+                                    color = if (isSelected) activeChipTextColor else inactiveChipTextColor,
                                     maxLines = 1,
                                 )
                             }
@@ -222,29 +386,79 @@ fun DetailEpisodesHeader(
                     }
                 }
 
-                if (hasDownloadSupport && episodesList.isNotEmpty()) {
-                    CircularActionButton(
-                        icon = Icons.Default.Download,
-                        contentDescription = "Download All",
-                        size = 36.dp,
-                        iconSize = 18.dp,
-                        onClick = { onBatchDownloadClick(episodesList) },
-                        onLongClick = onBatchDownloadLongClick,
+                if (hasDubOptions && hasRangeOptions) {
+                    Box(
+                        modifier = Modifier
+                            .padding(
+                                horizontal = if (elevatedGlassContrast) LiquidGlassTokens.Space.s8 else 10.dp,
+                            )
+                            .width(LiquidGlassTokens.Border.thin)
+                            .height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s14 else 16.dp)
+                            .background(Color.White.copy(alpha = if (elevatedGlassContrast) 0.20f else 0.12f)),
                     )
                 }
 
-                // Toggle between Horizontal Episode Carousel vs Vertical Episode List
-                CircularActionButton(
-                    icon = if (episodeLayoutStyle == EpisodeLayoutStyle.HORIZONTAL) {
-                        Icons.AutoMirrored.Filled.ViewList
-                    } else {
-                        Icons.Default.ViewCarousel
-                    },
-                    contentDescription = "Switch Episode Layout",
-                    size = 36.dp,
-                    iconSize = 18.dp,
-                    onClick = onToggleEpisodeLayoutStyle,
-                )
+                if (hasRangeOptions) {
+                    val rangeKey = remember(rangeOptions) {
+                        rangeOptions.firstOrNull()?.label.orEmpty()
+                    }
+                    val rangeListState = rememberSaveable(
+                        rangeKey,
+                        saver = LazyListState.Saver,
+                    ) {
+                        LazyListState()
+                    }
+                    LazyRow(
+                        state = rangeListState,
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            if (elevatedGlassContrast) LiquidGlassTokens.Space.s5 else 6.dp,
+                        ),
+                    ) {
+                        items(rangeOptions, key = { "range_${it.range.startIndex}_${it.label}" }) { rangeOpt ->
+                            val isSelected = rangeOpt.label == selectedRangeLabel
+                            Box(
+                                modifier = Modifier
+                                    .height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s28 else 30.dp)
+                                    .clip(
+                                        RoundedCornerShape(
+                                            if (elevatedGlassContrast) LiquidGlassTokens.Radius.md else 8.dp,
+                                        ),
+                                    )
+                                    .background(
+                                        if (isSelected) {
+                                            Color.White.copy(alpha = if (elevatedGlassContrast) 0.22f else 0.16f)
+                                        } else if (elevatedGlassContrast) {
+                                            Color.White.copy(alpha = 0.06f)
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                    )
+                                    .clickable { onRangeSelected(rangeOpt.range) }
+                                    .padding(
+                                        horizontal = if (elevatedGlassContrast) LiquidGlassTokens.Space.s8 else 10.dp,
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = rangeOpt.label,
+                                    style = if (elevatedGlassContrast) {
+                                        MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                        )
+                                    } else {
+                                        MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                        )
+                                    },
+                                    color = if (isSelected) activeChipTextColor else inactiveChipTextColor,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -364,22 +578,34 @@ fun DetailSeriesContent(
                     }
                 } else {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        episodesList.forEach { episode ->
-                            EpisodeListCard(
-                                episode = episode,
-                                fallbackBackdropUrl = fallbackBackdropUrl,
-                                hasDownloadSupport = hasDownloadSupport,
-                                onClick = { onEpisodeClick(episode) },
-                                onLongClick = { onEpisodeLongClick(episode) },
-                                onDownloadClick = { onEpisodeDownloadClick(episode) },
-                                onDownloadLongClick = { onEpisodeDownloadLongClick(episode) },
-                                onToggleWatched = { onEpisodeToggleWatched(episode) },
-                            )
+                        episodesList.forEachIndexed { index, episode ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp),
+                            ) {
+                                EpisodeListCard(
+                                    episode = episode,
+                                    fallbackBackdropUrl = fallbackBackdropUrl,
+                                    hasDownloadSupport = hasDownloadSupport,
+                                    onClick = { onEpisodeClick(episode) },
+                                    onLongClick = { onEpisodeLongClick(episode) },
+                                    onDownloadClick = { onEpisodeDownloadClick(episode) },
+                                    onDownloadLongClick = { onEpisodeDownloadLongClick(episode) },
+                                    onToggleWatched = { onEpisodeToggleWatched(episode) },
+                                )
+                            }
+                            if (index < episodesList.lastIndex) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 14.dp)
+                                        .height(1.dp)
+                                        .background(Color.White.copy(alpha = 0.08f)),
+                                )
+                            }
                         }
                     }
                 }
@@ -391,38 +617,64 @@ fun DetailSeriesContent(
 }
 
 @Composable
-private fun DetailFilterPill(
+private fun SeasonGlassPill(
     label: String,
     selected: Boolean,
-    isAccent: Boolean = false,
     onClick: () -> Unit,
+    elevatedGlassContrast: Boolean = false,
 ) {
+    val shape = RoundedCornerShape(
+        if (elevatedGlassContrast) LiquidGlassTokens.Radius.md else 10.dp,
+    )
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = shape,
         color = when {
-            selected && isAccent -> MaterialTheme.colorScheme.primary
-            selected -> MaterialTheme.colorScheme.onBackground
-            else -> Color.White.copy(alpha = 0.08f)
+            selected -> Color.White.copy(alpha = 0.22f)
+            else -> Color.White.copy(alpha = 0.06f)
         },
-        contentColor = when {
-            selected -> MaterialTheme.colorScheme.background
-            else -> MaterialTheme.colorScheme.onBackground
-        },
-        border = if (!selected) {
-            BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
-        } else {
-            null
+        border = when {
+            selected -> BorderStroke(
+                width = LiquidGlassTokens.Border.thin,
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color.White.copy(alpha = if (elevatedGlassContrast) 0.36f else 0.34f),
+                        Color.White.copy(alpha = if (elevatedGlassContrast) 0.10f else 0.08f),
+                    ),
+                ),
+            )
+            else -> null
         },
         modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
+            .height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s28 else 32.dp)
+            .clip(shape)
             .clickable(onClick = onClick),
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+        Box(
+            modifier = Modifier.padding(
+                horizontal = if (elevatedGlassContrast) LiquidGlassTokens.Space.s12 else 14.dp,
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                style = if (elevatedGlassContrast) {
+                    MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    )
+                } else {
+                    MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    )
+                },
+                color = when {
+                    selected -> MaterialTheme.liquidGlass.colors.textPrimary
+                    elevatedGlassContrast -> MaterialTheme.liquidGlass.colors.textMuted
+                    else -> Color(0xFF9898A0)
+                },
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -587,7 +839,7 @@ fun EpisodeHorizontalCard(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.MoreVert,
+                            painter = painterResource(R.drawable.ic_baseline_more_vert_24),
                             contentDescription = "Episode Options",
                             tint = Color.White,
                             modifier = Modifier.size(15.dp),
@@ -740,9 +992,13 @@ fun EpisodeListCard(
     onDownloadLongClick: () -> Unit,
     onToggleWatched: () -> Unit,
     modifier: Modifier = Modifier,
+    isPlaying: Boolean = false,
+    playingBadgeText: String? = null,
+    elevatedGlassContrast: Boolean = false,
 ) {
-    val cardShape = RoundedCornerShape(14.dp)
-    val thumbShape = RoundedCornerShape(10.dp)
+    val thumbShape = RoundedCornerShape(
+        if (elevatedGlassContrast) LiquidGlassTokens.Radius.md else 10.dp,
+    )
     val imageUrl = episode.poster?.takeIf { it.isNotBlank() } ?: fallbackBackdropUrl
     val isWatched = episode.videoWatchState == VideoWatchState.Watched
     val watchProgress = remember(episode.position, episode.duration) {
@@ -751,43 +1007,52 @@ fun EpisodeListCard(
     val ratingText = remember(episode.score) {
         episode.score?.toStringNull(0.1, 10, 1, false)
     }
-    val formattedDate = remember(episode.airDate) {
-        episode.airDate?.takeIf { it > 0L }?.let { millis ->
-            runCatching {
-                DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis))
-            }.getOrNull()
-        }
-    }
     val episodeTitle = remember(episode.name, episode.episode) {
         episode.name?.takeIf { it.isNotBlank() } ?: "Episode ${episode.episode}"
     }
     var expandSynopsis by remember(episode.id) { mutableStateOf(false) }
 
+    val accentColor = MaterialTheme.colorScheme.primary
+    val titleColor = when {
+        elevatedGlassContrast -> MaterialTheme.liquidGlass.colors.textPrimary
+        else -> Color(0xFFF5F5F7)
+    }
+    val metaColor = when {
+        elevatedGlassContrast -> MaterialTheme.liquidGlass.colors.textMuted.copy(alpha = 0.85f)
+        else -> Color(0xFF8E8E93)
+    }
+    val synopsisColor = when {
+        elevatedGlassContrast -> MaterialTheme.liquidGlass.colors.textMuted.copy(alpha = 0.90f)
+        else -> Color(0xFF9898A0)
+    }
+    val unwatchedTint = if (elevatedGlassContrast) {
+        MaterialTheme.liquidGlass.colors.textMuted
+    } else {
+        Color(0xFFA0A0A8)
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .cardDepth(shape = cardShape, surface = CardDepthSurface.CARD)
-            .clip(cardShape)
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.09f), cardShape)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(10.dp)
             .animateContentSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(
+            if (elevatedGlassContrast) LiquidGlassTokens.Space.s4 else 6.dp,
+        ),
     ) {
+        // Row 1: Thumbnail + Title/Meta + Minimal Actions
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Left Thumbnail
+            // Thumbnail (Left): compact 16:9 inside glass drawer, 124.dp x 70.dp on details
             Box(
                 modifier = Modifier
-                    .width(132.dp)
-                    .height(76.dp)
+                    .width(if (elevatedGlassContrast) LiquidGlassTokens.Space.s96 else 124.dp)
+                    .height(if (elevatedGlassContrast) LiquidGlassTokens.Space.s56 else 70.dp)
                     .clip(thumbShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
@@ -802,134 +1067,285 @@ fun EpisodeListCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.28f)),
+                        .background(Color.Black.copy(alpha = 0.22f)),
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .border(
+                            width = if (isPlaying && !elevatedGlassContrast) {
+                                LiquidGlassTokens.Border.thin
+                            } else {
+                                LiquidGlassTokens.Border.hairline
+                            },
+                            color = if (isPlaying && !elevatedGlassContrast) {
+                                accentColor.copy(alpha = 0.72f)
+                            } else {
+                                Color.White.copy(alpha = 0.14f)
+                            },
+                            shape = thumbShape,
+                        ),
                 )
                 Surface(
                     shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.56f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                    color = Color.Black.copy(alpha = 0.46f),
+                    border = BorderStroke(LiquidGlassTokens.Border.thin, Color.White.copy(alpha = 0.28f)),
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(32.dp),
+                        .size(if (elevatedGlassContrast) LiquidGlassTokens.Space.s24 else 28.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = "Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.liquidGlass.colors.textPrimary,
+                            modifier = Modifier.size(
+                                if (elevatedGlassContrast) LiquidGlassTokens.Icon.xs else 15.dp,
+                            ),
                         )
                     }
                 }
-                AnimatedWatchedBadge(
-                    visible = isWatched,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                )
                 if (watchProgress > 0f) {
-                    PosterProgressBar(
-                        progress = watchProgress,
+                    Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                    )
-                }
-            }
-
-            // Middle Info
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = "${episode.episode}. $episodeTitle",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                val metaTokens = buildList {
-                    if (episode.isFiller == true) add("Filler")
-                    episode.runTime?.takeIf { it > 0 }?.let { add("${it}m") }
-                    formattedDate?.let(::add)
-                    ratingText?.let { add("★ $it") }
-                }
-                if (metaTokens.isNotEmpty()) {
-                    Text(
-                        text = metaTokens.joinToString(" • "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            // Right Actions (Watched + Download)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (isWatched) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        Color.White.copy(alpha = 0.08f)
-                    },
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onToggleWatched),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Mark Watched",
-                            tint = if (isWatched) MaterialTheme.colorScheme.onPrimary else Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(16.dp),
+                            .height(
+                                if (elevatedGlassContrast) LiquidGlassTokens.Space.s2 else 3.dp,
+                            )
+                            .background(Color.White.copy(alpha = if (elevatedGlassContrast) 0.22f else 0.28f)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(watchProgress.coerceIn(0.04f, 1f))
+                                .fillMaxHeight()
+                                .background(
+                                    if (elevatedGlassContrast) {
+                                        MaterialTheme.liquidGlass.colors.textPrimary.copy(alpha = 0.86f)
+                                    } else {
+                                        accentColor
+                                    },
+                                ),
                         )
                     }
                 }
+            }
 
-                if (hasDownloadSupport) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.08f),
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .combinedClickable(
-                                onClick = onDownloadClick,
-                                onLongClick = onDownloadLongClick,
-                            ),
+            Spacer(
+                modifier = Modifier.width(
+                    if (elevatedGlassContrast) LiquidGlassTokens.Space.s10 else 14.dp,
+                ),
+            )
+
+            // Title & Compact Meta
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(
+                    if (elevatedGlassContrast) LiquidGlassTokens.Space.s3 else 4.dp,
+                ),
+            ) {
+                Text(
+                    text = "${episode.episode}. $episodeTitle",
+                    style = if (elevatedGlassContrast) {
+                        MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    } else {
+                        MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    },
+                    color = titleColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                val runtimeText = episode.runTime?.takeIf { it > 0 }?.let { "${it}m" }
+                val cleanRating = ratingText?.takeIf { it.isNotBlank() }
+                if (isPlaying || runtimeText != null || cleanRating != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(
+                            if (elevatedGlassContrast) LiquidGlassTokens.Space.s6 else 8.dp,
+                        ),
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Download",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp),
+                        if (isPlaying) {
+                            Surface(
+                                shape = RoundedCornerShape(LiquidGlassTokens.Radius.full),
+                                color = if (elevatedGlassContrast) {
+                                    Color.White.copy(alpha = 0.10f)
+                                } else {
+                                    Color.White.copy(alpha = 0.16f)
+                                },
+                                border = BorderStroke(
+                                    width = LiquidGlassTokens.Border.thin,
+                                    brush = Brush.linearGradient(
+                                        if (elevatedGlassContrast) {
+                                            listOf(
+                                                Color.White.copy(alpha = 0.24f),
+                                                Color.White.copy(alpha = 0.07f),
+                                            )
+                                        } else {
+                                            listOf(
+                                                Color.White.copy(alpha = 0.34f),
+                                                Color.White.copy(alpha = 0.08f),
+                                            )
+                                        },
+                                    ),
+                                ),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(
+                                        horizontal = if (elevatedGlassContrast) LiquidGlassTokens.Space.s7 else 8.dp,
+                                        vertical = LiquidGlassTokens.Space.s2,
+                                    ),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(
+                                        if (elevatedGlassContrast) LiquidGlassTokens.Space.s5 else 5.dp,
+                                    ),
+                                ) {
+                                    if (elevatedGlassContrast) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(LiquidGlassTokens.Space.s5)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    MaterialTheme.liquidGlass.colors.textPrimary.copy(alpha = 0.90f),
+                                                ),
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(accentColor),
+                                        )
+                                    }
+                                    Text(
+                                        text = playingBadgeText ?: stringResource(R.string.player_episode_playing),
+                                        style = if (elevatedGlassContrast) {
+                                            MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Medium,
+                                            )
+                                        } else {
+                                            MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        },
+                                        color = MaterialTheme.liquidGlass.colors.textPrimary.copy(alpha = 0.92f),
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+
+                        if (runtimeText != null || cleanRating != null) {
+                            val compactMeta = buildAnnotatedString {
+                                var needsSeparator = false
+                                if (runtimeText != null) {
+                                    append(runtimeText)
+                                    needsSeparator = true
+                                }
+                                if (cleanRating != null) {
+                                    if (needsSeparator) {
+                                        append("  •  ")
+                                    }
+                                    withStyle(SpanStyle(color = Color(0xFFF5C518))) {
+                                        append("★")
+                                    }
+                                    append(" ")
+                                    append(cleanRating)
+                                }
+                            }
+                            Text(
+                                text = compactMeta,
+                                style = if (elevatedGlassContrast) {
+                                    MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Normal)
+                                } else {
+                                    MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Normal,
+                                    )
+                                },
+                                color = metaColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
             }
+
+            Spacer(
+                modifier = Modifier.width(
+                    if (elevatedGlassContrast) LiquidGlassTokens.Space.s6 else 8.dp,
+                ),
+            )
+
+            // Minimal Action Icons (Right)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(if (elevatedGlassContrast) LiquidGlassTokens.Space.s32 else 36.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onToggleWatched),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Mark Watched",
+                        tint = when {
+                            isPlaying && elevatedGlassContrast ->
+                                MaterialTheme.liquidGlass.colors.textPrimary.copy(alpha = 0.90f)
+                            isWatched -> accentColor
+                            else -> unwatchedTint
+                        },
+                        modifier = Modifier.size(
+                            if (elevatedGlassContrast) LiquidGlassTokens.Icon.sm else 20.dp,
+                        ),
+                    )
+                }
+
+                if (hasDownloadSupport) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .combinedClickable(
+                                onClick = onDownloadClick,
+                                onLongClick = onDownloadLongClick,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download",
+                            tint = Color(0xFFA0A0A8),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
         }
 
+        // Row 2: Breathable Episode Synopsis
         if (!episode.description.isNullOrBlank()) {
             Text(
                 text = episode.description.trim(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = if (elevatedGlassContrast) {
+                    MaterialTheme.liquidGlassTypeScale.labelSm
+                } else {
+                    MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.5.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.Normal,
+                    )
+                },
+                color = synopsisColor,
                 maxLines = if (expandSynopsis) Int.MAX_VALUE else 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.clickable { expandSynopsis = !expandSynopsis },

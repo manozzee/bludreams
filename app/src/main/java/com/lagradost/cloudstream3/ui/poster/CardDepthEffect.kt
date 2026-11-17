@@ -171,7 +171,7 @@ fun rememberCardDepthStyleState(): CardDepthStyleState {
 fun Modifier.cardDepth(
     shape: Shape,
     surface: CardDepthSurface = CardDepthSurface.PosterCards,
-    fallbackBorderAlpha: Float = 0.08f,
+    fallbackBorderAlpha: Float = 0f,
     fallbackBorderWidth: Dp = 1.dp,
 ): Modifier = composed {
     val style = rememberCardDepthStyleState()

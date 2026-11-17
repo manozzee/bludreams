@@ -1,22 +1,20 @@
 package com.lagradost.cloudstream3.ui.player.source_priority
 
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
-import androidx.palette.graphics.Palette
-import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.databinding.PlayerQualityProfileItemBinding
 import com.lagradost.cloudstream3.ui.BaseDiffCallback
 import com.lagradost.cloudstream3.ui.NoStateAdapter
 import com.lagradost.cloudstream3.ui.ViewHolderState
-import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
-import com.lagradost.cloudstream3.utils.drawableToBitmap
 import com.lagradost.cloudstream3.utils.setText
 
 class ProfilesAdapter(
@@ -28,14 +26,14 @@ class ProfilesAdapter(
     })) {
 
     companion object {
-        private val art = arrayOf(
-            R.drawable.profile_bg_teal,
-            R.drawable.profile_bg_blue,
-            R.drawable.profile_bg_dark_blue,
-            R.drawable.profile_bg_purple,
-            R.drawable.profile_bg_pink,
-            R.drawable.profile_bg_red,
-            R.drawable.profile_bg_orange,
+        private val artColors = intArrayOf(
+            0xFF00897B.toInt(),
+            0xFF1E88E5.toInt(),
+            0xFF3949AB.toInt(),
+            0xFF8E24AA.toInt(),
+            0xFFD81B60.toInt(),
+            0xFFE53935.toInt(),
+            0xFFFB8C00.toInt(),
         )
     }
 
@@ -71,7 +69,6 @@ class ProfilesAdapter(
         val downloadText: TextView = binding.textIsDownloadData
         val outline: View = binding.outline
         val cardView: View = binding.cardView
-        val itemView = holder.itemView
 
         priorityText.setText(item.name)
         dataText.isVisible = item.types.contains(QualityDataHelper.QualityProfileType.Data)
@@ -89,31 +86,18 @@ class ProfilesAdapter(
         }
 
         outline.isVisible = currentItem == position
-        val drawableResId = art[position % art.size]
-        profileBg.loadImage(drawableResId)
-
-        val drawable = ContextCompat.getDrawable(itemView.context, drawableResId)
-        if (drawable != null) {
-            // Convert Drawable to Bitmap
-            val bitmap = drawableToBitmap(drawable)
-            if (bitmap != null) {
-                // Use Palette to extract colors from the bitmap
-                Palette.from(bitmap).generate { palette ->
-                    val color = palette?.getDarkVibrantColor(
-                        ContextCompat.getColor(
-                            itemView.context,
-                            R.color.dubColorBg
-                        )
-                    )
-
-                    if (color != null) {
-                        wifiText.backgroundTintList = ColorStateList.valueOf(color)
-                        dataText.backgroundTintList = ColorStateList.valueOf(color)
-                        downloadText.backgroundTintList = ColorStateList.valueOf(color)
-                    }
-                }
-            }
-        }
+        val baseColor = artColors[position % artColors.size]
+        val darkColor = ColorUtils.blendARGB(baseColor, Color.BLACK, 0.45f)
+        profileBg.setImageDrawable(
+            GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(baseColor, darkColor),
+            )
+        )
+        val badgeTint = ColorStateList.valueOf(darkColor)
+        wifiText.backgroundTintList = badgeTint
+        dataText.backgroundTintList = badgeTint
+        downloadText.backgroundTintList = badgeTint
 
         val textStyle =
             if (item.id == usedProfile) {

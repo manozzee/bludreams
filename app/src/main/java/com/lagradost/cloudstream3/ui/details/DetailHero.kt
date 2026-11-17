@@ -5,13 +5,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,14 +19,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import com.lagradost.cloudstream3.ui.AppIcons as Icons
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,22 +31,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import com.lagradost.cloudstream3.ui.liquidglass.CircularActionButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.lagradost.cloudstream3.ui.liquidglass.CircularActionButton
 import com.lagradost.cloudstream3.ui.liquidglass.HERO_BACKGROUND_SCALE
 import com.lagradost.cloudstream3.ui.liquidglass.heroBackgroundScrollScale
 import com.lagradost.cloudstream3.ui.liquidglass.heroBackgroundScrollTranslationY
@@ -114,67 +111,77 @@ fun DetailHero(
         val layout = remember(maxWidth) {
             homeHeroLayout(maxWidthDp = maxWidth.value)
         }
-        val bottomFadeHeight = layout.bottomFadeHeight
         val scrollScale = heroBackgroundScrollScale(scrollOffsetPx)
         val scrollTranslationY = heroBackgroundScrollTranslationY(scrollOffsetPx)
 
         // Background media layer (Backdrop + Background Trailer ExoPlayer Surface)
+        // Dissolves smoothly into Color.Transparent via BlendMode.DstIn with zero solid-color strip
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .heroStretchZoom(stretchPx),
-        ) {
-            if (!resolvedBackdrop.isNullOrBlank()) {
-                AsyncImage(
-                    model = resolvedBackdrop,
-                    contentDescription = title,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            alpha = backdropAlpha
-                            translationY = scrollTranslationY
-                            scaleX = HERO_BACKGROUND_SCALE * scrollScale
-                            scaleY = HERO_BACKGROUND_SCALE * scrollScale
-                        },
-                    contentScale = ContentScale.Crop,
-                    alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    MaterialTheme.colorScheme.background,
-                                ),
-                            ),
+                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0.00f to Color.Black,
+                            0.38f to Color.Black,
+                            0.52f to Color.Black.copy(alpha = 0.84f),
+                            0.65f to Color.Black.copy(alpha = 0.56f),
+                            0.76f to Color.Black.copy(alpha = 0.28f),
+                            0.85f to Color.Black.copy(alpha = 0.10f),
+                            0.92f to Color.Black.copy(alpha = 0.025f),
+                            0.97f to Color.Transparent,
+                            1.00f to Color.Transparent,
                         ),
-                )
-            }
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .heroStretchZoom(stretchPx),
+            ) {
+                if (!resolvedBackdrop.isNullOrBlank()) {
+                    AsyncImage(
+                        model = resolvedBackdrop,
+                        contentDescription = title,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = backdropAlpha
+                                translationY = scrollTranslationY
+                                scaleX = HERO_BACKGROUND_SCALE * scrollScale
+                                scaleY = HERO_BACKGROUND_SCALE * scrollScale
+                            },
+                        contentScale = ContentScale.Crop,
+                        alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
+                    )
+                }
 
-            if (trailerMirror != null) {
-                HeroTrailerPlayerSurface(
-                    videoUrl = trailerMirror.link.url,
-                    audioTracks = trailerMirror.link.audioTracks,
-                    headers = trailerMirror.link.headers,
-                    referer = trailerMirror.link.referer,
-                    isPlaying = isTrailerPlaying,
-                    isMuted = isTrailerMuted,
-                    onReady = onTrailerReady,
-                    onEnded = onTrailerEnded,
-                    onError = onTrailerError,
-                    cropToFill = true,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            alpha = videoAlpha
-                            translationY = scrollTranslationY
-                            scaleX = HERO_BACKGROUND_SCALE * scrollScale
-                            scaleY = HERO_BACKGROUND_SCALE * scrollScale
-                        },
-                )
+                if (trailerMirror != null) {
+                    HeroTrailerPlayerSurface(
+                        videoUrl = trailerMirror.link.url,
+                        audioTracks = trailerMirror.link.audioTracks,
+                        headers = trailerMirror.link.headers,
+                        referer = trailerMirror.link.referer,
+                        isPlaying = isTrailerPlaying,
+                        isMuted = isTrailerMuted,
+                        onReady = onTrailerReady,
+                        onEnded = onTrailerEnded,
+                        onError = onTrailerError,
+                        cropToFill = true,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = videoAlpha
+                                translationY = scrollTranslationY
+                                scaleX = HERO_BACKGROUND_SCALE * scrollScale
+                                scaleY = HERO_BACKGROUND_SCALE * scrollScale
+                            },
+                    )
+                }
             }
         }
 
@@ -194,45 +201,13 @@ fun DetailHero(
                 ),
         )
 
-        // Multi-stop vertical gradient for smooth background transition (matching HomeHeroSection)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.02f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.78f),
-                        ),
-                    ),
-                ),
-        )
-
-        // Bottom fade layer matching HomeHeroSection
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(bottomFadeHeight)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background.copy(alpha = 0f),
-                            MaterialTheme.colorScheme.background,
-                        ),
-                    ),
-                ),
-        )
-
-        // Foreground Clearlogo or Title at bottom of Hero
+        // Foreground Clearlogo or Title at bottom of Hero (Left-Aligned)
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
+                .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.Start,
         ) {
             val validLogo = logoUrl?.takeIf { it.isNotBlank() && !logoLoadFailed }
             if (validLogo != null) {
@@ -240,25 +215,27 @@ fun DetailHero(
                     model = validLogo,
                     contentDescription = title,
                     modifier = Modifier
-                        .widthIn(max = 260.dp)
-                        .fillMaxWidth(0.68f)
-                        .height(84.dp)
+                        .height(58.dp)
+                        .widthIn(max = 220.dp)
                         .combinedClickable(
                             onClick = {},
                             onLongClick = onTitleLongClick,
                         ),
                     contentScale = ContentScale.Fit,
-                    alignment = Alignment.BottomCenter,
+                    alignment = Alignment.CenterStart,
                     onError = { logoLoadFailed = true },
                 )
             } else {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center,
-                    maxLines = 3,
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontSize = 28.sp,
+                        lineHeight = 34.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = Color(0xFFF5F5F7),
+                    textAlign = TextAlign.Start,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.combinedClickable(
                         onClick = {},
@@ -273,7 +250,7 @@ fun DetailHero(
 @Composable
 fun DetailFloatingHeader(
     title: String,
-    collapseProgress: Float,
+    isScrolledPastHeroLogo: Boolean,
     showTrailerMuteButton: Boolean,
     isTrailerMuted: Boolean,
     showSyncButton: Boolean,
@@ -282,6 +259,8 @@ fun DetailFloatingHeader(
     onSyncClick: () -> Unit,
     onShareClick: () -> Unit,
     modifier: Modifier = Modifier,
+    logoUrl: String? = null,
+    stickyBackgroundColor: Color = MaterialTheme.colorScheme.background,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -289,13 +268,28 @@ fun DetailFloatingHeader(
     val statusBarPadding = remember(insetsPadding, context, density) {
         if (insetsPadding > 0.dp) insetsPadding else with(density) { context.getStatusBarHeight().toDp() }
     }
-    val clampedProgress = collapseProgress.coerceIn(0f, 1f)
+    val targetReveal = if (isScrolledPastHeroLogo) 1f else 0f
+    val headerBgAlpha by animateFloatAsState(
+        targetValue = targetReveal,
+        animationSpec = tween(durationMillis = 220),
+        label = "detailHeaderBgAlpha",
+    )
+    val titleAlpha by animateFloatAsState(
+        targetValue = targetReveal,
+        animationSpec = tween(durationMillis = 220),
+        label = "detailHeaderTitleAlpha",
+    )
+    var logoLoadFailed by remember(logoUrl, title) { mutableStateOf(false) }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                MaterialTheme.colorScheme.background.copy(alpha = clampedProgress * 0.94f),
+                if (headerBgAlpha <= 0.001f) {
+                    Color.Transparent
+                } else {
+                    stickyBackgroundColor.copy(alpha = headerBgAlpha)
+                },
             )
             .padding(top = statusBarPadding + 14.dp, bottom = 8.dp, start = 16.dp, end = 16.dp),
     ) {
@@ -315,17 +309,38 @@ fun DetailFloatingHeader(
                     onClick = onBackClick,
                 )
 
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.graphicsLayer {
-                        alpha = ((clampedProgress - 0.55f) / 0.45f).coerceIn(0f, 1f)
-                    },
-                )
+                val validLogo = logoUrl?.takeIf { it.isNotBlank() && !logoLoadFailed }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                        .graphicsLayer { alpha = titleAlpha },
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    if (validLogo != null) {
+                        AsyncImage(
+                            model = validLogo,
+                            contentDescription = title,
+                            modifier = Modifier
+                                .height(26.dp)
+                                .widthIn(max = 160.dp),
+                            contentScale = ContentScale.Fit,
+                            alignment = Alignment.CenterStart,
+                            onError = { logoLoadFailed = true },
+                        )
+                    } else {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            color = Color(0xFFF5F5F7),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
 
             Row(

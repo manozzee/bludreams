@@ -13,8 +13,8 @@
         <item name="android:scrollbarThumbVertical">@null</item>
         <item name="android:scrollbarThumbHorizontal">@null</item>
 
-        <item name="fontFamily">@font/figtree</item>
-        <item name="android:fontFamily">@font/figtree</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:fontFamily">@font/inter</item>
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="android:buttonStyle">@style/AppButtonStyle</item>
         <item name="android:editTextStyle">@style/AppEditStyle</item>
@@ -99,9 +99,9 @@
         <item name="textColor">@color/chip_color_text</item>
         <item name="android:textColor">@color/chip_color_text</item>
         <item name="checkedIconTint">@color/chip_color_text</item>
-        <item name="fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
         <item name="chipIconTint">@color/chip_color_text</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
         <item name="android:tag">@string/tv_no_focus_tag</item>
         <item name="chipMinTouchTargetSize">0dp</item>
         <item name="checkedIconVisible">false</item>
@@ -335,8 +335,8 @@
         <item name="android:searchIcon">@drawable/search_icon</item>
         <item name="android:queryHint">@string/search_hint</item>
         <item name="android:background">@color/transparent</item>
-        <item name="fontFamily">@font/figtree</item>
-        <item name="android:fontFamily">@font/figtree</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:fontFamily">@font/inter</item>
         <item name="closeIcon">@drawable/ic_baseline_close_24</item>
     </style>
 
@@ -378,125 +378,125 @@
 
     <!-- Centralized Reusable Typography Styles -->
     <style name="TextAppearance.CloudStream.Headline" parent="TextAppearance.MaterialComponents.Headline5">
-        <item name="fontFamily">@font/outfit_semibold</item>
-        <item name="android:fontFamily">@font/outfit_semibold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_semibold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_semibold</item>
         <item name="android:textStyle">normal</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title" parent="TextAppearance.MaterialComponents.Headline6">
-        <item name="fontFamily">@font/outfit_semibold</item>
-        <item name="android:fontFamily">@font/outfit_semibold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_semibold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_semibold</item>
         <item name="android:textStyle">normal</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title.Thin" parent="TextAppearance.CloudStream.Title">
-        <item name="fontFamily">@font/outfit_thin</item>
-        <item name="android:fontFamily">@font/outfit_thin</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_extralight</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_extralight</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title.Light" parent="TextAppearance.CloudStream.Title">
-        <item name="fontFamily">@font/outfit_light</item>
-        <item name="android:fontFamily">@font/outfit_light</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_light</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_light</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title.Regular" parent="TextAppearance.CloudStream.Title">
-        <item name="fontFamily">@font/outfit_regular</item>
-        <item name="android:fontFamily">@font/outfit_regular</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_regular</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_regular</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title.Medium" parent="TextAppearance.CloudStream.Title">
-        <item name="fontFamily">@font/outfit_medium</item>
-        <item name="android:fontFamily">@font/outfit_medium</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_medium</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_medium</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title.SemiBold" parent="TextAppearance.CloudStream.Title">
-        <item name="fontFamily">@font/outfit_semibold</item>
-        <item name="android:fontFamily">@font/outfit_semibold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_semibold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_semibold</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title.Bold" parent="TextAppearance.CloudStream.Title">
-        <item name="fontFamily">@font/outfit_bold</item>
-        <item name="android:fontFamily">@font/outfit_bold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_bold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_bold</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Title.Black" parent="TextAppearance.CloudStream.Title">
-        <item name="fontFamily">@font/outfit_black</item>
-        <item name="android:fontFamily">@font/outfit_black</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_extrabold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_extrabold</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Body" parent="TextAppearance.MaterialComponents.Body2">
-        <item name="fontFamily">@font/figtree</item>
-        <item name="android:fontFamily">@font/figtree</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:fontFamily">@font/inter</item>
         <item name="android:textStyle">normal</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Body.Light" parent="TextAppearance.CloudStream.Body">
-        <item name="fontFamily">@font/figtree_light</item>
-        <item name="android:fontFamily">@font/figtree_light</item>
+        <item name="fontFamily">@font/inter_light</item>
+        <item name="android:fontFamily">@font/inter_light</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Body.Regular" parent="TextAppearance.CloudStream.Body">
-        <item name="fontFamily">@font/figtree_regular</item>
-        <item name="android:fontFamily">@font/figtree_regular</item>
+        <item name="fontFamily">@font/inter_regular</item>
+        <item name="android:fontFamily">@font/inter_regular</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Body.Medium" parent="TextAppearance.CloudStream.Body">
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Body.SemiBold" parent="TextAppearance.CloudStream.Body">
-        <item name="fontFamily">@font/figtree_semibold</item>
-        <item name="android:fontFamily">@font/figtree_semibold</item>
+        <item name="fontFamily">@font/inter_semibold</item>
+        <item name="android:fontFamily">@font/inter_semibold</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Body.Bold" parent="TextAppearance.CloudStream.Body">
-        <item name="fontFamily">@font/figtree_bold</item>
-        <item name="android:fontFamily">@font/figtree_bold</item>
+        <item name="fontFamily">@font/inter_bold</item>
+        <item name="android:fontFamily">@font/inter_bold</item>
     </style>
 
     <style name="TextAppearance.CloudStream.SectionHeader" parent="TextAppearance.MaterialComponents.Headline6">
-        <item name="fontFamily">@font/outfit_semibold</item>
-        <item name="android:fontFamily">@font/outfit_semibold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_semibold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_semibold</item>
         <item name="android:textStyle">normal</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textColor">?attr/textColor</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Player.Title" parent="TextAppearance.MaterialComponents.Headline6">
-        <item name="fontFamily">@font/outfit_medium</item>
-        <item name="android:fontFamily">@font/outfit_medium</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_medium</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_medium</item>
         <item name="android:textStyle">normal</item>
         <item name="android:textSize">13.5sp</item>
         <item name="android:textColor">?attr/white</item>
     </style>
 
     <style name="TextAppearance.CloudStream.Player.Timer" parent="TextAppearance.MaterialComponents.Caption">
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
         <item name="android:fontFeatureSettings">tnum</item>
         <item name="android:textSize">12.5sp</item>
     </style>
 
     <style name="TabNoCaps" parent="TextAppearance.Design.Tab">
         <item name="textAllCaps">false</item>
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
     </style>
 
     <style name="AppTextViewStyle" parent="android:Widget.TextView">
-        <item name="fontFamily">@font/figtree</item>
-        <item name="android:fontFamily">@font/figtree</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:fontFamily">@font/inter</item>
     </style>
 
     <style name="AppButtonStyle" parent="android:Widget.Holo.Button">
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
     </style>
 
     <style name="AppEditStyle" parent="android:Widget.EditText">
-        <item name="fontFamily">@font/figtree</item>
-        <item name="android:fontFamily">@font/figtree</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:fontFamily">@font/inter</item>
     </style>
 
     <style name="ResultInfoText">
@@ -513,8 +513,8 @@
     </style>
 
     <style name="AppMaterialButtonStyle" parent="Widget.MaterialComponents.Button">
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
     </style>
 
     <style name="Theme.Widget.Tabs" parent="Widget.MaterialComponents.TabLayout.Colored">
@@ -606,16 +606,16 @@
     </style>
 
     <style name="AppPreferenceCategoryTitleTextStyle">
-        <item name="fontFamily">@font/outfit_semibold</item>
-        <item name="android:fontFamily">@font/outfit_semibold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_semibold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_semibold</item>
         <item name="android:textStyle">normal</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textColor">?attr/textColor</item>
     </style>
 
     <style name="AppPreferenceSummaryTextStyle">
-        <item name="fontFamily">@font/figtree</item>
-        <item name="android:fontFamily">@font/figtree</item>
+        <item name="fontFamily">@font/inter</item>
+        <item name="android:fontFamily">@font/inter</item>
         <item name="android:textSize">13sp</item>
     </style>
 
@@ -646,8 +646,8 @@
         <item name="android:background">?attr/focusBackground</item>
         <item name="android:textColor">?attr/textColor</item>
         <item name="android:textAppearance">?android:attr/textAppearanceListItemSmall</item>
-        <item name="fontFamily">@font/outfit_semibold</item>
-        <item name="android:fontFamily">@font/outfit_semibold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_semibold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_semibold</item>
         <item name="android:textStyle">normal</item>
         <item name="drawableEndCompat">@drawable/ic_baseline_keyboard_arrow_right_24</item>
     </style>
@@ -660,15 +660,15 @@
         <item name="android:textSize">14.5sp</item>
         <item name="android:layout_marginEnd">50dp</item>
         <item name="android:textStyle">normal</item>
-        <item name="fontFamily">@font/outfit_semibold</item>
-        <item name="android:fontFamily">@font/outfit_semibold</item>
+        <item name="fontFamily">@font/plus_jakarta_sans_semibold</item>
+        <item name="android:fontFamily">@font/plus_jakarta_sans_semibold</item>
     </style>
 
     <style name="SearchBox">
         <item name="android:background">@drawable/bg_color_both</item>
         <item name="android:minWidth">40dp</item>
-        <item name="fontFamily">@font/figtree_regular</item>
-        <item name="android:fontFamily">@font/figtree_regular</item>
+        <item name="fontFamily">@font/inter_regular</item>
+        <item name="android:fontFamily">@font/inter_regular</item>
         <item name="android:textStyle">normal</item>
         <item name="android:gravity">center</item>
         <item name="android:layout_width">match_parent</item>
@@ -689,8 +689,8 @@
         <!--removes shadow-->
         <item name="android:stateListAnimator">@null</item>
 
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
         <item name="android:padding">5dp</item>
         <item name="android:layout_marginStart">5dp</item>
         <item name="android:layout_marginEnd">5dp</item>
@@ -746,8 +746,8 @@
 
 
     <style name="NoCheckLabel" parent="@style/AppTextViewStyle">
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:minHeight">?android:attr/listPreferredItemHeightSmall</item>
@@ -819,8 +819,8 @@
 
     <style name="ExtendedFloatingActionButton">
         <item name="elevation">0dp</item>
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
         <item name="android:textStyle">bold</item>
         <item name="backgroundTint">?attr/primaryGrayBackground</item>
         <item name="tint">?attr/colorPrimary</item>
@@ -835,8 +835,8 @@
     </style>
 
     <style name="RoundedSelectableButton">
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
         <item name="backgroundTint">@color/toggle_button</item>
         <item name="rippleColor">@color/colorRipple</item>
         <item name="android:textColor">@color/toggle_button_text</item>
@@ -879,8 +879,8 @@
 
     <style name="VideoButton">
         <item name="android:stateListAnimator">@null</item>
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
         <item name="strokeColor">@color/transparent</item>
         <item name="backgroundTint">@color/transparent</item>
         <item name="rippleColor">@color/colorRipple</item>
@@ -942,8 +942,8 @@
         <item name="android:background">@drawable/player_button_tv_attr</item>
         <item name="rippleColor">@color/colorRipple</item>
         <item name="android:shadowColor">@color/transparent</item>
-        <item name="fontFamily">@font/figtree_medium</item>
-        <item name="android:fontFamily">@font/figtree_medium</item>
+        <item name="fontFamily">@font/inter_medium</item>
+        <item name="android:fontFamily">@font/inter_medium</item>
 
         <item name="iconTint">@color/player_on_button_tv_attr</item>
         <item name="textColor">@color/player_on_button_tv_attr</item>

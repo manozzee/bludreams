@@ -13,6 +13,8 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -27,6 +29,9 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.blue
 import androidx.core.graphics.green
 import androidx.core.graphics.red
@@ -40,6 +45,7 @@ import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.SimpleItemAnimator
 import com.google.android.material.button.MaterialButton
 import com.lagradost.cloudstream3.CommonActivity.keyEventListener
+import com.lagradost.cloudstream3.DubStatus
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.databinding.FragmentPlayerBinding
@@ -47,8 +53,21 @@ import com.lagradost.cloudstream3.databinding.PlayerCustomLayoutBinding
 import com.lagradost.cloudstream3.databinding.SpeedDialogBinding
 import com.lagradost.cloudstream3.databinding.SubtitleOffsetBinding
 import com.lagradost.cloudstream3.mvvm.logError
+import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
 import com.lagradost.cloudstream3.ui.player.GeneratorPlayer.Companion.subsProvidersIsActive
+import com.lagradost.cloudstream3.ui.player.hud.DoubleTapSeekFeedback
+import com.lagradost.cloudstream3.ui.player.hud.PlaybackProgressSnapshot
+import com.lagradost.cloudstream3.ui.player.hud.PlayerCompressorDialogState
+import com.lagradost.cloudstream3.ui.player.hud.PlayerHudCallbacks
+import com.lagradost.cloudstream3.ui.player.hud.PlayerHudOverlay
+import com.lagradost.cloudstream3.ui.player.hud.PlayerHudState
+import com.lagradost.cloudstream3.ui.player.hud.PlayerSelectionPopupKind
+import com.lagradost.cloudstream3.ui.player.hud.PlayerSelectionPopupState
+import com.lagradost.cloudstream3.ui.player.hud.PlayerSpeedDialogState
+import com.lagradost.cloudstream3.ui.player.hud.PlayerSubtitleOffsetDialogState
 import com.lagradost.cloudstream3.ui.player.source_priority.QualityDataHelper
+import com.lagradost.cloudstream3.ui.result.EpisodeRange
+import com.lagradost.cloudstream3.ui.result.ResultEpisode
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
 import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
@@ -66,6 +85,8 @@ import com.lagradost.cloudstream3.utils.UIHelper.popCurrentPage
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import com.lagradost.cloudstream3.utils.setText
 import com.lagradost.cloudstream3.utils.txt
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlin.math.roundToInt
 
 private const val SUBTITLE_DELAY_BUNDLE_KEY = "subtitle_delay"
@@ -115,7 +136,191 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         }
 
     private var isShowingEpisodeOverlay: Boolean = false
+    private var isShowingSourceSubsOverlay: Boolean = false
+    private var isShowingTracksOverlay: Boolean = false
+    private var isShowingSpeedOverlay: Boolean = false
+    private var isShowingCompressorOverlay: Boolean = false
+    private var isShowingSubtitleOffsetOverlay: Boolean = false
     private var previousPlayStatus: Boolean = false
+
+    private var speedDialogWasPlaying: Boolean = false
+    private data class CompressorSnapshot(
+        val enabled: Boolean,
+        val threshold: Float,
+        val makeupGain: Float,
+    )
+    private var compressorSnapshot: CompressorSnapshot? = null
+
+    protected open val useComposeHud: Boolean
+        get() = !isLayout(TV or EMULATOR) && playerBinding?.playerComposeHud != null
+
+    override fun usesComposeHud(): Boolean = useComposeHud
+
+    override fun onTorrentConfirmationRequest(onDecision: (Boolean) -> Unit): Boolean {
+        if (!useComposeHud) return false
+        val ctx = context ?: return false
+        showComposeConfirmPopup(
+            title = ctx.getString(R.string.play_torrent_button),
+            message = ctx.getString(R.string.torrent_info),
+            confirmLabel = ctx.getString(R.string.ok),
+            dismissLabel = ctx.getString(R.string.go_back),
+            cancelable = false,
+            onDismiss = { onDecision(false) },
+            onConfirm = { onDecision(true) },
+        )
+        return true
+    }
+
+    protected val hudStateFlow = MutableStateFlow(PlayerHudState())
+
+    protected inline fun updateHudState(transform: PlayerHudState.() -> PlayerHudState) {
+        hudStateFlow.update(transform)
+    }
+
+    private var selectionPopupToken: Long = 0L
+    private var selectionSingleAction: ((Int) -> Unit)? = null
+    private var selectionMultiAction: ((Set<Int>) -> Unit)? = null
+    private var selectionConfirmAction: (() -> Unit)? = null
+    private var selectionDismissAction: (() -> Unit)? = null
+
+    protected fun syncOverlayAutoHideAndSubtitles() {
+        if (!useComposeHud) return
+        if (hudStateFlow.value.hasAnyOverlayOpen) {
+            playerHostView?.cancelAutoHide()
+        } else if (isShowing) {
+            autoHide()
+        }
+        animateLayoutChangesForSubtitles()
+    }
+
+    protected fun showComposeSingleChoicePopup(
+        title: String,
+        items: List<String>,
+        selectedIndex: Int,
+        cancelable: Boolean = true,
+        onDismiss: () -> Unit = {},
+        onSelect: (Int) -> Unit,
+    ) {
+        selectionSingleAction = onSelect
+        selectionMultiAction = null
+        selectionConfirmAction = null
+        selectionDismissAction = onDismiss
+        val token = ++selectionPopupToken
+        updateHudState {
+            copy(
+                selectionPopup = PlayerSelectionPopupState(
+                    token = token,
+                    title = title,
+                    kind = PlayerSelectionPopupKind.SingleChoice(
+                        items = items,
+                        selectedIndex = selectedIndex,
+                    ),
+                    cancelable = cancelable,
+                ),
+            )
+        }
+        syncOverlayAutoHideAndSubtitles()
+    }
+
+    protected fun showComposeMultiChoicePopup(
+        title: String,
+        items: List<String>,
+        selectedIndices: Set<Int>,
+        cancelable: Boolean = true,
+        onDismiss: () -> Unit = {},
+        onApply: (Set<Int>) -> Unit,
+    ) {
+        selectionSingleAction = null
+        selectionMultiAction = onApply
+        selectionConfirmAction = null
+        selectionDismissAction = onDismiss
+        val token = ++selectionPopupToken
+        updateHudState {
+            copy(
+                selectionPopup = PlayerSelectionPopupState(
+                    token = token,
+                    title = title,
+                    kind = PlayerSelectionPopupKind.MultiChoice(
+                        items = items,
+                        selectedIndices = selectedIndices,
+                    ),
+                    cancelable = cancelable,
+                ),
+            )
+        }
+        syncOverlayAutoHideAndSubtitles()
+    }
+
+    protected fun showComposeConfirmPopup(
+        title: String?,
+        message: String,
+        confirmLabel: String,
+        dismissLabel: String? = null,
+        cancelable: Boolean = true,
+        onDismiss: () -> Unit = {},
+        onConfirm: () -> Unit = {},
+    ) {
+        selectionSingleAction = null
+        selectionMultiAction = null
+        selectionConfirmAction = onConfirm
+        selectionDismissAction = onDismiss
+        val token = ++selectionPopupToken
+        updateHudState {
+            copy(
+                selectionPopup = PlayerSelectionPopupState(
+                    token = token,
+                    title = title,
+                    kind = PlayerSelectionPopupKind.MessageConfirm(
+                        message = message,
+                        confirmLabel = confirmLabel,
+                        dismissLabel = dismissLabel,
+                    ),
+                    cancelable = cancelable,
+                ),
+            )
+        }
+        syncOverlayAutoHideAndSubtitles()
+    }
+
+    protected fun dismissComposeSelectionPopup(invokeDismiss: Boolean) {
+        val dismissCallback = selectionDismissAction
+        selectionSingleAction = null
+        selectionMultiAction = null
+        selectionConfirmAction = null
+        selectionDismissAction = null
+        updateHudState { copy(selectionPopup = null) }
+        syncOverlayAutoHideAndSubtitles()
+        if (invokeDismiss) {
+            dismissCallback?.invoke()
+        }
+        activity?.hideSystemUI()
+    }
+
+    private fun handleSelectionPopupSingleSelect(index: Int) {
+        val action = selectionSingleAction
+        dismissComposeSelectionPopup(invokeDismiss = false)
+        action?.invoke(index)
+    }
+
+    private fun handleSelectionPopupMultiApply(indices: Set<Int>) {
+        val action = selectionMultiAction
+        dismissComposeSelectionPopup(invokeDismiss = false)
+        action?.invoke(indices)
+    }
+
+    private fun handleSelectionPopupConfirm() {
+        val action = selectionConfirmAction
+        dismissComposeSelectionPopup(invokeDismiss = false)
+        action?.invoke()
+    }
+
+    private var composeBottomDockHeightPx: Int = 0
+    private var scrubWasPlaying: Boolean = false
+    private val hudUiHandler = Handler(Looper.getMainLooper())
+    private var doubleTapFeedbackToken: Long = 0L
+    private var doubleTapClearRunnable: Runnable? = null
+    private var volumeHideRunnable: Runnable? = null
+    private var brightnessHideRunnable: Runnable? = null
 
     override fun fixLayout(view: View) = Unit
 
@@ -176,6 +381,12 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
                 || selectSubtitlesDialog?.isShowing == true
                 || selectCompressorDialog?.isShowing == true
                 || isShowingEpisodeOverlay
+                || isShowingSourceSubsOverlay
+                || isShowingTracksOverlay
+                || isShowingSpeedOverlay
+                || isShowingCompressorOverlay
+                || isShowingSubtitleOffsetOverlay
+                || hudStateFlow.value.hasAnySecondaryPopup
 
     private fun scheduleMetadataVisibility() {
         val metadataScrim = playerBinding?.playerMetadataScrim ?: return
@@ -232,6 +443,7 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     }
 
     override fun onDestroyView() {
+        hudUiHandler.removeCallbacksAndMessages(null)
         playerHostView?.releaseOverlayLayoutListener()
         playerBinding = null
         super.onDestroyView()
@@ -261,11 +473,155 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         return false
     }
 
+    open fun onEpisodeDrawerSeasonSelected(season: Int) {}
+    open fun onEpisodeDrawerDubSelected(status: DubStatus) {}
+    open fun onEpisodeDrawerRangeSelected(range: EpisodeRange) {}
+    open fun onEpisodeDrawerSortClick() {}
+    open fun onEpisodeDrawerEpisodeClick(episode: ResultEpisode) {}
+    open fun onEpisodeDrawerToggleWatched(episode: ResultEpisode) {}
+
+    open fun onSourceSubsDismiss() {}
+    open fun onSourceSubsApply() {}
+    open fun onSourceSelected(index: Int) {}
+    open fun onSourceLongClick(index: Int) {}
+    open fun onSourceProfileSettingsClick() {}
+    open fun onSubtitleGroupSelected(index: Int) {}
+    open fun onSubtitleAudioOptionSelected(index: Int) {}
+    open fun onSubtitleEncodingClick() {}
+    open fun onSubtitleSettingsClick() {}
+    open fun onLoadSubtitlesFromFile() {}
+    open fun onLoadSubtitlesOnline() {}
+    open fun onLoadFirstSubtitleOnline() {}
+
+    open fun onTracksDismiss() {}
+    open fun onTracksApply() {}
+    open fun onVideoTrackSelected(index: Int) {}
+    open fun onAudioTrackSelected(index: Int) {}
+
+    open fun onQualityProfileDismiss() {}
+    open fun onQualityProfileUse() {}
+    open fun onQualityProfileSelected(profileId: Int) {}
+    open fun onQualityProfileEditClick() {}
+    open fun onQualityProfileSetDefaultClick() {}
+    open fun onQualityProfileEditNameChanged(name: String) {}
+    open fun onQualityProfileSourcePriorityStep(key: String, delta: Int) {}
+    open fun onQualityProfileQualityPriorityStep(key: String, delta: Int) {}
+    open fun onQualityProfileEditSave() {}
+    open fun onQualityProfileEditClose() {}
+    open fun onQualityProfileHelpClick() {}
+    open fun onQualityProfileSettingsOpen() {}
+    open fun onQualityProfileHideNegativeChanged(checked: Boolean) {}
+    open fun onQualityProfileHideErrorChanged(checked: Boolean) {}
+    open fun onQualityProfileSettingsApply() {}
+    open fun onQualityProfileSettingsCancel() {}
+
+    open fun onOnlineSubtitlesDismiss() {}
+    open fun onOnlineSubtitlesQueryChanged(query: String) {}
+    open fun onOnlineSubtitlesSearchSubmit() {}
+    open fun onOnlineSubtitlesYearClick() {}
+    open fun onOnlineSubtitlesLanguageClick() {}
+    open fun onOnlineSubtitlesResultSelected(index: Int) {}
+    open fun onOnlineSubtitlesApply() {}
+
+    open fun onSubtitleSettingsDismiss() {}
+
+    protected fun setSourceSubsOverlayVisible(visible: Boolean) {
+        if (isShowingSourceSubsOverlay == visible) return
+        isShowingSourceSubsOverlay = visible
+        if (useComposeHud) {
+            if (visible) {
+                playerHostView?.cancelAutoHide()
+            } else if (isShowing) {
+                autoHide()
+            }
+            updateHudState { copy(isSourceSubsDialogVisible = visible) }
+            animateLayoutChangesForSubtitles()
+        }
+    }
+
+    protected fun setTracksOverlayVisible(visible: Boolean) {
+        if (isShowingTracksOverlay == visible) return
+        isShowingTracksOverlay = visible
+        if (useComposeHud) {
+            if (visible) {
+                playerHostView?.cancelAutoHide()
+            } else if (isShowing) {
+                autoHide()
+            }
+            updateHudState { copy(isTracksDialogVisible = visible) }
+            animateLayoutChangesForSubtitles()
+        }
+    }
+
+    private fun setSpeedOverlayVisible(visible: Boolean) {
+        if (isShowingSpeedOverlay == visible) return
+        isShowingSpeedOverlay = visible
+        if (useComposeHud) {
+            if (visible) {
+                playerHostView?.cancelAutoHide()
+            } else if (isShowing) {
+                autoHide()
+            }
+            updateHudState { copy(isSpeedDialogVisible = visible) }
+            animateLayoutChangesForSubtitles()
+        }
+    }
+
+    private fun setCompressorOverlayVisible(visible: Boolean) {
+        if (isShowingCompressorOverlay == visible) return
+        isShowingCompressorOverlay = visible
+        if (useComposeHud) {
+            if (visible) {
+                playerHostView?.cancelAutoHide()
+            } else if (isShowing) {
+                autoHide()
+            }
+            updateHudState { copy(isCompressorDialogVisible = visible) }
+            animateLayoutChangesForSubtitles()
+        }
+    }
+
+    private fun setSubtitleOffsetOverlayVisible(visible: Boolean) {
+        if (isShowingSubtitleOffsetOverlay == visible) return
+        isShowingSubtitleOffsetOverlay = visible
+        if (useComposeHud) {
+            if (visible) {
+                playerHostView?.cancelAutoHide()
+            } else if (isShowing) {
+                autoHide()
+            }
+            updateHudState { copy(isSubtitleOffsetDialogVisible = visible) }
+            animateLayoutChangesForSubtitles()
+        }
+    }
+
     override fun exitedPipMode() {
         animateLayoutChanges()
     }
 
-    private fun animateLayoutChangesForSubtitles() =
+    private fun animateLayoutChangesForSubtitles() {
+        if (useComposeHud) {
+            playerBinding?.playerComposeHud?.post {
+                val sView = subView ?: return@post
+                val sStyle = CustomDecoder.style
+                val dockOffset = if (composeBottomDockHeightPx > 0) {
+                    composeBottomDockHeightPx + 16.toPx
+                } else {
+                    120.toPx
+                }
+                val move = if (
+                    isShowing &&
+                    !isLocked &&
+                    !hudStateFlow.value.hasAnyOverlayOpen
+                ) {
+                    minOf(-sStyle.elevation.toPx, -dockOffset)
+                } else {
+                    -sStyle.elevation.toPx
+                }
+                sView.animateY(move.toFloat())
+            }
+            return
+        }
         // Post here as bottomPlayerBar is gone the first frame => bottomPlayerBar.height = 0
         playerBinding?.bottomPlayerBar?.post {
             val sView = subView ?: return@post
@@ -281,6 +637,7 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
 
             sView.animateY(move.toFloat())
         }
+    }
 
     private fun View.animateY(value: Float) {
         ObjectAnimator.ofFloat(this, "translationY", value).apply {
@@ -297,6 +654,14 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     }
 
     protected fun animateLayoutChanges() {
+        if (useComposeHud) {
+            if (!isShowing) {
+                toggleEpisodesOverlay(false)
+            }
+            updateUIVisibility()
+            animateLayoutChangesForSubtitles()
+            return
+        }
 
         playerBinding?.apply {
 
@@ -362,9 +727,13 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         val isBuiltinSubtitles = tracks.currentTextTracks.all { track ->
             track.sampleMimeType == MimeTypes.APPLICATION_MEDIA3_CUES
         }
-        // Subtitle offset is not possible on built-in media3 tracks
-        playerBinding?.playerSubtitleOffsetBtt?.isGone =
-            isBuiltinSubtitles || tracks.currentTextTracks.isEmpty()
+        val canOffset = !(isBuiltinSubtitles || tracks.currentTextTracks.isEmpty())
+        if (useComposeHud) {
+            updateHudState { copy(canOffsetSubtitles = canOffset) }
+        } else {
+            // Subtitle offset is not possible on built-in media3 tracks
+            playerBinding?.playerSubtitleOffsetBtt?.isGone = !canOffset
+        }
     }
 
     private fun restoreOrientationWithSensor(activity: Activity) {
@@ -461,7 +830,40 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         setupKeyEventListener()
         playerHostView?.verifyVolume()
         activity?.attachBackPressedCallback("FullScreenPlayer") {
-            if (isShowingEpisodeOverlay) {
+            val currentHud = hudStateFlow.value
+            if (currentHud.selectionPopup != null) {
+                dismissComposeSelectionPopup(invokeDismiss = true)
+                return@attachBackPressedCallback
+            } else if (currentHud.isSubtitleSettingsVisible) {
+                onSubtitleSettingsDismiss()
+                return@attachBackPressedCallback
+            } else if (currentHud.isQualityProfileDialogVisible) {
+                val qp = currentHud.qualityProfileDialog
+                when {
+                    qp.isEditingProfileSettings -> onQualityProfileSettingsCancel()
+                    qp.editingProfileId != null -> onQualityProfileEditClose()
+                    else -> onQualityProfileDismiss()
+                }
+                return@attachBackPressedCallback
+            } else if (currentHud.isOnlineSubtitlesDialogVisible) {
+                onOnlineSubtitlesDismiss()
+                return@attachBackPressedCallback
+            } else if (isShowingSubtitleOffsetOverlay) {
+                dismissComposeSubtitleOffsetDialog()
+                return@attachBackPressedCallback
+            } else if (isShowingSpeedOverlay) {
+                dismissComposeSpeedDialog()
+                return@attachBackPressedCallback
+            } else if (isShowingCompressorOverlay) {
+                cancelComposeCompressorDialog()
+                return@attachBackPressedCallback
+            } else if (isShowingTracksOverlay) {
+                onTracksDismiss()
+                return@attachBackPressedCallback
+            } else if (isShowingSourceSubsOverlay) {
+                onSourceSubsDismiss()
+                return@attachBackPressedCallback
+            } else if (isShowingEpisodeOverlay) {
                 // isShowingEpisodeOverlay pauses, so this makes it easier to unpause
                 if (isLayout(TV or EMULATOR)) {
                     playerPausePlay?.requestFocus()
@@ -501,6 +903,9 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         }
 
         player.setPlaybackSpeed(speed)
+        if (useComposeHud) {
+            updateHudState { copy(playbackSpeed = speed) }
+        }
     }
 
     private fun skipOp() {
@@ -508,6 +913,10 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     }
 
     private fun showSubtitleOffsetDialog() {
+        if (useComposeHud) {
+            showComposeSubtitleOffsetDialog()
+            return
+        }
         val ctx = context ?: return
         // Pause player because the subtitles cannot be continuously updated to follow playback.
         player.handleEvent(
@@ -633,6 +1042,107 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         }
     }
 
+    private fun showComposeSubtitleOffsetDialog() {
+        val ctx = context ?: return
+        // Pause player because the subtitles cannot be continuously updated to follow playback.
+        player.handleEvent(
+            CSPlayerEvent.Pause,
+            PlayerEventSource.UI
+        )
+
+        val initialOffset = subtitleDelay
+        val cues = player.getSubtitleCues().toList()
+        val playerPosition = player.getPosition() ?: 0L
+        val totalPosition = playerPosition + initialOffset
+        val activeIndex = cues.withIndex().lastOrNull {
+            totalPosition >= it.value.startTimeMs
+        }?.index ?: 0
+
+        updateHudState {
+            copy(
+                subtitleOffsetDialog = PlayerSubtitleOffsetDialogState(
+                    inputText = initialOffset.toString(),
+                    offsetMs = initialOffset,
+                    timelinePositionMs = totalPosition,
+                    statusText = formatSubtitleOffsetStatusText(ctx, initialOffset),
+                    cues = cues,
+                    activeCueIndex = activeIndex,
+                    scrollTriggerToken = subtitleOffsetDialog.scrollTriggerToken + 1L,
+                )
+            )
+        }
+        setSubtitleOffsetOverlayVisible(true)
+    }
+
+    private fun updateComposeSubtitleOffsetInput(inputText: String) {
+        val ctx = context ?: return
+        val parsed = inputText.toLongOrNull()
+        if (parsed != null) {
+            val playerPosition = player.getPosition() ?: 0L
+            val totalPosition = playerPosition + parsed
+            updateHudState {
+                val activeIndex = subtitleOffsetDialog.cues.withIndex().lastOrNull {
+                    totalPosition >= it.value.startTimeMs
+                }?.index ?: 0
+                copy(
+                    subtitleOffsetDialog = subtitleOffsetDialog.copy(
+                        inputText = inputText,
+                        offsetMs = parsed,
+                        timelinePositionMs = totalPosition,
+                        statusText = formatSubtitleOffsetStatusText(ctx, parsed),
+                        activeCueIndex = activeIndex,
+                        scrollTriggerToken = subtitleOffsetDialog.scrollTriggerToken + 1L,
+                    )
+                )
+            }
+        } else {
+            updateHudState {
+                copy(
+                    subtitleOffsetDialog = subtitleOffsetDialog.copy(
+                        inputText = inputText,
+                    )
+                )
+            }
+        }
+    }
+
+    private fun stepComposeSubtitleOffset(deltaMs: Long) {
+        val current = hudStateFlow.value.subtitleOffsetDialog.inputText.toLongOrNull() ?: 0L
+        updateComposeSubtitleOffsetInput((current + deltaMs).toString())
+    }
+
+    private fun onComposeSubtitleOffsetCueClick(cue: SubtitleCue) {
+        val playerPosition = player.getPosition() ?: 0L
+        updateComposeSubtitleOffsetInput((cue.startTimeMs - playerPosition).toString())
+    }
+
+    private fun applyComposeSubtitleOffsetDialog() {
+        subtitleDelay = hudStateFlow.value.subtitleOffsetDialog.offsetMs
+        setSubtitleOffsetOverlayVisible(false)
+        activity?.hideSystemUI()
+        player.seekTime(1L)
+    }
+
+    private fun resetComposeSubtitleOffsetDialog() {
+        subtitleDelay = 0L
+        setSubtitleOffsetOverlayVisible(false)
+        activity?.hideSystemUI()
+        player.seekTime(1L)
+    }
+
+    private fun dismissComposeSubtitleOffsetDialog() {
+        setSubtitleOffsetOverlayVisible(false)
+        activity?.hideSystemUI()
+    }
+
+    private fun formatSubtitleOffsetStatusText(ctx: Context, timeMs: Long): String {
+        return when {
+            timeMs > 0L -> ctx.getString(R.string.subtitle_offset_extra_hint_before_format, timeMs)
+            timeMs < 0L -> ctx.getString(R.string.subtitle_offset_extra_hint_later_format, -timeMs)
+            else -> ctx.getString(R.string.subtitle_offset_extra_hint_none_format)
+        }
+    }
+
     @SuppressLint("SetTextI18n")
     fun updateSpeedDialogBinding(binding: SpeedDialogBinding) {
         val speed = player.getPlaybackSpeed()
@@ -644,6 +1154,10 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     }
 
     private fun showSpeedDialog() {
+        if (useComposeHud) {
+            showComposeSpeedDialog()
+            return
+        }
         val act = activity ?: return
         val isPlaying = player.getIsPlaying()
         player.handleEvent(CSPlayerEvent.Pause, PlayerEventSource.UI)
@@ -708,12 +1222,46 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         //}
     }
 
+    private fun showComposeSpeedDialog() {
+        speedDialogWasPlaying = player.getIsPlaying()
+        player.handleEvent(CSPlayerEvent.Pause, PlayerEventSource.UI)
+        pushComposeSpeedState()
+        setSpeedOverlayVisible(true)
+    }
+
+    private fun pushComposeSpeedState() {
+        val speed = player.getPlaybackSpeed()
+        val speedText = "%.2fx".format(speed).replace(".0x", "x")
+        updateHudState {
+            copy(
+                speedDialog = PlayerSpeedDialogState(
+                    speed = speed,
+                    speedText = speedText,
+                ),
+            )
+        }
+    }
+
+    private fun dismissComposeSpeedDialog() {
+        val wasPlaying = speedDialogWasPlaying
+        speedDialogWasPlaying = false
+        setSpeedOverlayVisible(false)
+        activity?.hideSystemUI()
+        if (wasPlaying) {
+            player.handleEvent(CSPlayerEvent.Play, PlayerEventSource.UI)
+        }
+    }
+
     // getColorStateList(index) on a TypedArray built from a raw intArrayOf(...) can't be
     // statically verified by lint as a styleable resource index (it isn't tied to an
     // <declare-styleable>), so it always flags a false-positive ResourceType error here —
     // this is the standard, expected suppression for this obtainStyledAttributes pattern.
     @SuppressLint("ResourceType")
     private fun showCompressorDialog() {
+        if (useComposeHud) {
+            showComposeCompressorDialog()
+            return
+        }
         val act = activity ?: return
         val compressor = (player as? CS3IPlayer)?.compressor ?: return
 
@@ -933,6 +1481,9 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
             .setOnDismissListener {
                 activity?.hideSystemUI()
                 selectCompressorDialog = null
+                if (useComposeHud) {
+                    updateHudState { copy(isCompressorActive = compressor.enabled) }
+                }
             }
             .create()
         selectCompressorDialog = dialog
@@ -954,6 +1505,75 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         }
 
         dialog.show()
+    }
+
+    private fun showComposeCompressorDialog() {
+        val act = activity ?: return
+        val compressor = (player as? CS3IPlayer)?.compressor ?: return
+        restoreCompressorSettings()
+        compressorSnapshot = CompressorSnapshot(
+            enabled = compressor.enabled,
+            threshold = compressor.threshold,
+            makeupGain = compressor.makeupGain,
+        )
+        pushComposeCompressorState(act)
+        setCompressorOverlayVisible(true)
+    }
+
+    private fun pushComposeCompressorState(ctx: Context? = context) {
+        val safeCtx = ctx ?: return
+        val compressor = (player as? CS3IPlayer)?.compressor ?: return
+        val thresholdInt = compressor.threshold.toInt()
+        val makeupInt = compressor.makeupGain.toInt()
+        val statusText = if (compressor.enabled) {
+            safeCtx.getString(R.string.compressor_on_format, thresholdInt, makeupInt)
+        } else {
+            safeCtx.getString(R.string.compressor_off)
+        }
+        updateHudState {
+            copy(
+                compressorDialog = PlayerCompressorDialogState(
+                    enabled = compressor.enabled,
+                    statusText = statusText,
+                    threshold = compressor.threshold,
+                    thresholdLabel = safeCtx.getString(R.string.compressor_threshold_label, thresholdInt),
+                    thresholdHint = safeCtx.getString(R.string.compressor_threshold_hint, thresholdInt),
+                    makeupGain = compressor.makeupGain,
+                    makeupLabel = safeCtx.getString(R.string.compressor_makeup_label, makeupInt),
+                    makeupHint = safeCtx.getString(R.string.compressor_makeup_hint, makeupInt),
+                ),
+                isCompressorActive = compressor.enabled,
+            )
+        }
+    }
+
+    private fun cancelComposeCompressorDialog() {
+        val compressor = (player as? CS3IPlayer)?.compressor
+        val snap = compressorSnapshot
+        if (compressor != null && snap != null) {
+            compressor.enabled = snap.enabled
+            compressor.threshold = snap.threshold
+            compressor.makeupGain = snap.makeupGain
+        }
+        dismissComposeCompressorDialog()
+    }
+
+    private fun applyComposeCompressorDialog() {
+        val compressor = (player as? CS3IPlayer)?.compressor
+        if (compressor != null) {
+            saveCompressorSettings(compressor)
+        }
+        dismissComposeCompressorDialog()
+    }
+
+    private fun dismissComposeCompressorDialog() {
+        val compressor = (player as? CS3IPlayer)?.compressor
+        compressorSnapshot = null
+        setCompressorOverlayVisible(false)
+        activity?.hideSystemUI()
+        if (compressor != null) {
+            updateHudState { copy(isCompressorActive = compressor.enabled) }
+        }
     }
 
     private fun saveCompressorSettings(c: DynamicRangeCompressor) {
@@ -995,6 +1615,13 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
             }, 200)
         }
 
+        if (useComposeHud) {
+            updateUIVisibility()
+            animateLayoutChangesForSubtitles()
+            updateLockUI()
+            return
+        }
+
         val fadeTo = if (isLocked) 0f else 1f
         playerHostView?.gestureHelper?.animateCenterControls(fadeTo)
         playerBinding?.apply {
@@ -1026,7 +1653,32 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         updateLockUI()
     }
 
+    private fun hideLegacyViewsForComposeHud() {
+        playerBinding?.apply {
+            piphide.children.forEach { child ->
+                if (child.id != R.id.player_compose_hud) {
+                    child.isGone = true
+                }
+            }
+            playerSpeedupButton.isGone = true
+            playerEpisodesButtonRoot.isGone = true
+            playerComposeHud.isVisible = true
+        }
+    }
+
     private fun updateUIVisibility() {
+        if (useComposeHud) {
+            hideLegacyViewsForComposeHud()
+            updateHudState {
+                copy(
+                    isShowing = this@FullScreenPlayer.isShowing,
+                    isLocked = this@FullScreenPlayer.isLocked,
+                    status = currentPlayerStatus,
+                    hasEpisodes = isThereEpisodes(),
+                )
+            }
+            return
+        }
         val isGone = isLocked || !isShowing
         var togglePlayerTitleGone = isGone
         context?.let {
@@ -1059,6 +1711,10 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     }
 
     private fun updateLockUI() {
+        if (useComposeHud) {
+            updateHudState { copy(isLocked = this@FullScreenPlayer.isLocked) }
+            return
+        }
         playerBinding?.apply {
             playerLock.setIconResource(if (isLocked) R.drawable.video_locked else R.drawable.video_unlocked)
             val color = if (isLocked) context?.colorFromAttribute(R.attr.colorPrimary)
@@ -1103,6 +1759,10 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
 
     @SuppressLint("SetTextI18n")
     override fun onSeekPreviewText(text: String?) {
+        if (useComposeHud) {
+            updateHudState { copy(seekPreviewText = text) }
+            return
+        }
         playerBinding?.playerTimeText?.apply {
             isVisible = text != null
             if (text != null) this.text = text
@@ -1124,16 +1784,93 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     override fun playerStatusChanged() {
         super.playerStatusChanged()
         scheduleMetadataVisibility()
+        if (useComposeHud) {
+            updateHudState {
+                copy(
+                    status = currentPlayerStatus,
+                    positionMs = player.getPosition() ?: positionMs,
+                    durationMs = player.getDuration()?.takeIf { it > 0L } ?: durationMs,
+                    bufferedPositionMs = player.getBufferedPosition()?.coerceAtLeast(0L) ?: bufferedPositionMs,
+                    isAtLiveEdge = player.isAtLiveEdge(),
+                )
+            }
+        }
     }
 
     // When the hold-speedup gesture fires, hide controls so the video is unobstructed.
     // The speedup button show/hide and speed change are handled by PlayerView.
     override fun onHoldSpeedUp(show: Boolean) {
+        if (useComposeHud) {
+            updateHudState { copy(isSpeedUpActive = show) }
+        }
         if (show && isShowing) onClickChange()
+    }
+
+    override fun onDoubleTapSeek(isForward: Boolean, deltaMs: Long) {
+        if (!useComposeHud) return
+        val deltaSec = (deltaMs / 1000L).toInt().coerceAtLeast(1)
+        val newToken = ++doubleTapFeedbackToken
+        updateHudState {
+            val prev = doubleTapFeedback
+            val accumulated = if (prev != null && prev.isForward == isForward) {
+                prev.seconds + deltaSec
+            } else {
+                deltaSec
+            }
+            copy(
+                doubleTapFeedback = DoubleTapSeekFeedback(
+                    isForward = isForward,
+                    seconds = accumulated,
+                    token = newToken,
+                )
+            )
+        }
+        doubleTapClearRunnable?.let { hudUiHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            if (doubleTapFeedbackToken == newToken) {
+                updateHudState { copy(doubleTapFeedback = null) }
+            }
+        }
+        doubleTapClearRunnable = runnable
+        hudUiHandler.postDelayed(runnable, 850L)
+    }
+
+    override fun onVolumeChanged(volume: Float, hasBoostError: Boolean) {
+        if (!useComposeHud) return
+        updateHudState {
+            copy(
+                isVolumeVisible = true,
+                volumeLevel = volume,
+                volumeBoostError = hasBoostError,
+            )
+        }
+        volumeHideRunnable?.let { hudUiHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            updateHudState { copy(isVolumeVisible = false) }
+        }
+        volumeHideRunnable = runnable
+        hudUiHandler.postDelayed(runnable, 1500L)
+    }
+
+    override fun onBrightnessChanged(brightness: Float) {
+        if (!useComposeHud) return
+        updateHudState {
+            copy(
+                isBrightnessVisible = true,
+                brightnessLevel = brightness,
+            )
+        }
+        brightnessHideRunnable?.let { hudUiHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            updateHudState { copy(isBrightnessVisible = false) }
+        }
+        brightnessHideRunnable = runnable
+        hudUiHandler.postDelayed(runnable, 1500L)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        playerHostView?.applyFullscreenCutoutMode()
 
         // If we rotate the device we need to recalculate the zoom
         val gh = playerHostView?.gestureHelper ?: return
@@ -1151,6 +1888,9 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     override fun resize(resize: PlayerResize, showToast: Boolean) {
         super.resize(resize, showToast)
         playerHostView?.requestUpdateBrightnessOverlayOnNextLayout()
+        if (useComposeHud) {
+            updateHudState { copy(resizeMode = resize) }
+        }
     }
 
     private fun handleKeyDownEvent(keyCode: Int): Boolean? {
@@ -1344,7 +2084,40 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
             it.isVisible = false
         }
         isShowing = false
+        isShowingSourceSubsOverlay = false
+        isShowingTracksOverlay = false
+        isShowingSpeedOverlay = false
+        isShowingCompressorOverlay = false
+        isShowingSubtitleOffsetOverlay = false
+        selectionSingleAction = null
+        selectionMultiAction = null
+        selectionConfirmAction = null
+        selectionDismissAction = null
         toggleEpisodesOverlay(false)
+        if (useComposeHud) {
+            updateHudState {
+                copy(
+                    isShowing = false,
+                    isEpisodesDrawerVisible = false,
+                    isSourceSubsDialogVisible = false,
+                    isTracksDialogVisible = false,
+                    isSpeedDialogVisible = false,
+                    isCompressorDialogVisible = false,
+                    isSubtitleOffsetDialogVisible = false,
+                    selectionPopup = null,
+                    isQualityProfileDialogVisible = false,
+                    isOnlineSubtitlesDialogVisible = false,
+                    isSubtitleSettingsVisible = false,
+                    hasNextEpisode = false,
+                    isSkipOpVisible = false,
+                    hasMultipleTracks = false,
+                    timestampText = null,
+                    doubleTapFeedback = null,
+                    seekPreviewText = null,
+                    isSpeedUpActive = false,
+                )
+            }
+        }
         // if nothing has loaded these buttons should not be visible
         playerBinding?.apply {
             playerSkipEpisode.isVisible = false
@@ -1376,6 +2149,7 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
 
         // This player is always full-screen; tell PlayerView so volume-key handling is active.
         playerHostView?.isFullScreen = true
+        playerHostView?.applyFullscreenCutoutMode()
 
         // Wire up the snap-hint outline view and schedule brightness overlay bounds update
         playerHostView?.videoOutline = playerBinding?.videoOutline
@@ -1452,6 +2226,9 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
                 if (hideControlsNames) {
                     hideControlsNames()
                 }
+            }
+            if (useComposeHud) {
+                setupComposeHud()
             }
         } catch (e: Exception) {
             logError(e)
@@ -1588,6 +2365,267 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         }
     }
 
+    private fun setupComposeHud() {
+        val composeView = playerBinding?.playerComposeHud ?: return
+        hideLegacyViewsForComposeHud()
+
+        val callbacks = PlayerHudCallbacks(
+            onBackClick = { activity?.popCurrentPage("FullScreenPlayer") },
+            onPlayPauseClick = {
+                autoHide()
+                if (currentPlayerStatus == CSPlayerLoading.IsEnded && isLayout(PHONE)) {
+                    player.handleEvent(CSPlayerEvent.Restart, PlayerEventSource.UI)
+                } else {
+                    player.handleEvent(CSPlayerEvent.PlayPauseToggle, PlayerEventSource.UI)
+                }
+            },
+            onLockToggle = { toggleLock() },
+            onRotateClick = {
+                autoHide()
+                toggleRotate()
+            },
+            onResizeClick = {
+                autoHide()
+                nextResize()
+            },
+            onSpeedClick = {
+                autoHide()
+                showSpeedDialog()
+            },
+            onCompressorClick = {
+                autoHide()
+                showCompressorDialog()
+            },
+            onSubtitleOffsetClick = { showSubtitleOffsetDialog() },
+            onTracksClick = { showTracksDialogue() },
+            onSourcesClick = { showMirrorsDialogue() },
+            onSkipOpClick = {
+                autoHide()
+                skipOp()
+            },
+            onNextEpisodeClick = {
+                autoHide()
+                player.handleEvent(CSPlayerEvent.NextEpisode)
+            },
+            onSkipChapterClick = {
+                autoHide()
+                player.handleEvent(CSPlayerEvent.SkipCurrentChapter)
+            },
+            onEpisodesClick = { toggleEpisodesOverlay(show = true) },
+            onDismissEpisodesDrawer = { toggleEpisodesOverlay(show = false) },
+            onEpisodeDrawerSeasonSelected = { season -> onEpisodeDrawerSeasonSelected(season) },
+            onEpisodeDrawerDubSelected = { dubStatus -> onEpisodeDrawerDubSelected(dubStatus) },
+            onEpisodeDrawerRangeSelected = { range -> onEpisodeDrawerRangeSelected(range) },
+            onEpisodeDrawerSortClick = { onEpisodeDrawerSortClick() },
+            onEpisodeDrawerEpisodeClick = { episode -> onEpisodeDrawerEpisodeClick(episode) },
+            onEpisodeDrawerToggleWatched = { episode -> onEpisodeDrawerToggleWatched(episode) },
+            onSourceSubsDismiss = { onSourceSubsDismiss() },
+            onSourceSubsApply = { onSourceSubsApply() },
+            onSourceSelected = { index -> onSourceSelected(index) },
+            onSourceLongClick = { index -> onSourceLongClick(index) },
+            onSourceProfileSettingsClick = { onSourceProfileSettingsClick() },
+            onSubtitleGroupSelected = { index -> onSubtitleGroupSelected(index) },
+            onSubtitleAudioOptionSelected = { index -> onSubtitleAudioOptionSelected(index) },
+            onSubtitleEncodingClick = { onSubtitleEncodingClick() },
+            onSubtitleSettingsClick = { onSubtitleSettingsClick() },
+            onLoadSubtitlesFromFile = { onLoadSubtitlesFromFile() },
+            onLoadSubtitlesOnline = { onLoadSubtitlesOnline() },
+            onLoadFirstSubtitleOnline = { onLoadFirstSubtitleOnline() },
+            onTracksDismiss = { onTracksDismiss() },
+            onTracksApply = { onTracksApply() },
+            onVideoTrackSelected = { index -> onVideoTrackSelected(index) },
+            onAudioTrackSelected = { index -> onAudioTrackSelected(index) },
+            onSpeedDismiss = { dismissComposeSpeedDialog() },
+            onSpeedChanged = { value ->
+                setPlayBackSpeed(value)
+                pushComposeSpeedState()
+            },
+            onSpeedStep = { delta ->
+                val nextSpeed = if (delta < 0f) {
+                    maxOf(player.getPlaybackSpeed() + delta, 0.1f)
+                } else {
+                    minOf(player.getPlaybackSpeed() + delta, 2.0f)
+                }
+                setPlayBackSpeed(nextSpeed)
+                pushComposeSpeedState()
+            },
+            onSpeedPresetSelected = { speed ->
+                setPlayBackSpeed(speed)
+                pushComposeSpeedState()
+            },
+            onCompressorDismiss = { cancelComposeCompressorDialog() },
+            onCompressorApply = { applyComposeCompressorDialog() },
+            onCompressorReset = {
+                val compressor = (player as? CS3IPlayer)?.compressor
+                if (compressor != null) {
+                    compressor.threshold = -24f
+                    compressor.makeupGain = 12f
+                    compressor.enabled = true
+                    pushComposeCompressorState()
+                }
+            },
+            onCompressorEnabledChanged = { enabled ->
+                val compressor = (player as? CS3IPlayer)?.compressor
+                if (compressor != null) {
+                    compressor.enabled = enabled
+                    pushComposeCompressorState()
+                }
+            },
+            onCompressorThresholdChanged = { value ->
+                val compressor = (player as? CS3IPlayer)?.compressor
+                if (compressor != null) {
+                    compressor.threshold = value.coerceIn(-30f, 0f)
+                    pushComposeCompressorState()
+                }
+            },
+            onCompressorMakeupGainChanged = { value ->
+                val compressor = (player as? CS3IPlayer)?.compressor
+                if (compressor != null) {
+                    compressor.makeupGain = value.coerceIn(0f, 24f)
+                    pushComposeCompressorState()
+                }
+            },
+            onCompressorPresetSelected = { threshold, makeupGain ->
+                val compressor = (player as? CS3IPlayer)?.compressor
+                if (compressor != null) {
+                    compressor.threshold = threshold
+                    compressor.makeupGain = makeupGain
+                    pushComposeCompressorState()
+                }
+            },
+            onSubtitleOffsetDismiss = { dismissComposeSubtitleOffsetDialog() },
+            onSubtitleOffsetApply = { applyComposeSubtitleOffsetDialog() },
+            onSubtitleOffsetReset = { resetComposeSubtitleOffsetDialog() },
+            onSubtitleOffsetInputChanged = { text -> updateComposeSubtitleOffsetInput(text) },
+            onSubtitleOffsetStep = { delta -> stepComposeSubtitleOffset(delta) },
+            onSubtitleOffsetCueClick = { cue -> onComposeSubtitleOffsetCueClick(cue) },
+            onSelectionPopupDismiss = { dismissComposeSelectionPopup(invokeDismiss = true) },
+            onSelectionPopupSingleSelect = { idx -> handleSelectionPopupSingleSelect(idx) },
+            onSelectionPopupMultiApply = { indices -> handleSelectionPopupMultiApply(indices) },
+            onSelectionPopupConfirm = { handleSelectionPopupConfirm() },
+            onQualityProfileDismiss = { onQualityProfileDismiss() },
+            onQualityProfileUse = { onQualityProfileUse() },
+            onQualityProfileSelected = { id -> onQualityProfileSelected(id) },
+            onQualityProfileEditClick = { onQualityProfileEditClick() },
+            onQualityProfileSetDefaultClick = { onQualityProfileSetDefaultClick() },
+            onQualityProfileEditNameChanged = { name -> onQualityProfileEditNameChanged(name) },
+            onQualityProfileSourcePriorityStep = { key, delta ->
+                onQualityProfileSourcePriorityStep(key, delta)
+            },
+            onQualityProfileQualityPriorityStep = { key, delta ->
+                onQualityProfileQualityPriorityStep(key, delta)
+            },
+            onQualityProfileEditSave = { onQualityProfileEditSave() },
+            onQualityProfileEditClose = { onQualityProfileEditClose() },
+            onQualityProfileHelpClick = { onQualityProfileHelpClick() },
+            onQualityProfileSettingsOpen = { onQualityProfileSettingsOpen() },
+            onQualityProfileHideNegativeChanged = { checked ->
+                onQualityProfileHideNegativeChanged(checked)
+            },
+            onQualityProfileHideErrorChanged = { checked ->
+                onQualityProfileHideErrorChanged(checked)
+            },
+            onQualityProfileSettingsApply = { onQualityProfileSettingsApply() },
+            onQualityProfileSettingsCancel = { onQualityProfileSettingsCancel() },
+            onOnlineSubtitlesDismiss = { onOnlineSubtitlesDismiss() },
+            onOnlineSubtitlesQueryChanged = { query -> onOnlineSubtitlesQueryChanged(query) },
+            onOnlineSubtitlesSearchSubmit = { onOnlineSubtitlesSearchSubmit() },
+            onOnlineSubtitlesYearClick = { onOnlineSubtitlesYearClick() },
+            onOnlineSubtitlesLanguageClick = { onOnlineSubtitlesLanguageClick() },
+            onOnlineSubtitlesResultSelected = { index -> onOnlineSubtitlesResultSelected(index) },
+            onOnlineSubtitlesApply = { onOnlineSubtitlesApply() },
+            onSubtitleSettingsDismiss = { onSubtitleSettingsDismiss() },
+            onToggleDurationMode = {
+                val nextMode = !(playerHostView?.durationMode ?: false)
+                playerHostView?.durationMode = nextMode
+                updateHudState { copy(durationModeRemaining = nextMode) }
+            },
+            onSeekTo = { targetMs ->
+                val durationMs = player.getDuration()?.takeIf { it > 0L } ?: 0L
+                player.seekTo(targetMs, PlayerEventSource.UI)
+                if (durationMs > 0L) {
+                    playerPositionChanged(targetMs, durationMs)
+                }
+                updateHudState {
+                    copy(
+                        positionMs = targetMs,
+                        durationMs = if (durationMs > 0L) durationMs else this.durationMs,
+                    )
+                }
+            },
+            onScrubStateChanged = { scrubbing ->
+                if (scrubbing) {
+                    playerHostView?.cancelAutoHide()
+                    scrubWasPlaying = player.getIsPlaying()
+                    if (scrubWasPlaying) {
+                        player.handleEvent(CSPlayerEvent.Pause, PlayerEventSource.Player)
+                    }
+                    if (player.hasPreview()) {
+                        subView?.isVisible = false
+                    }
+                } else {
+                    if (scrubWasPlaying) {
+                        player.handleEvent(CSPlayerEvent.Play, PlayerEventSource.Player)
+                    }
+                    scrubWasPlaying = false
+                    subView?.postDelayed({ subView?.isVisible = true }, 200L)
+                    autoHide()
+                }
+            },
+            hasPreview = { player.hasPreview() },
+            getPreviewBitmap = { fraction -> player.getPreview(fraction) },
+            pollProgress = {
+                PlaybackProgressSnapshot(
+                    positionMs = player.getPosition() ?: 0L,
+                    durationMs = player.getDuration()?.takeIf { it > 0L } ?: 0L,
+                    bufferedPositionMs = player.getBufferedPosition()?.coerceAtLeast(0L) ?: 0L,
+                    isAtLiveEdge = player.isAtLiveEdge(),
+                )
+            },
+            onInteraction = { autoHide() },
+            onBottomDockHeightChanged = { heightPx ->
+                if (composeBottomDockHeightPx != heightPx) {
+                    composeBottomDockHeightPx = heightPx
+                    animateLayoutChangesForSubtitles()
+                }
+            },
+        )
+
+        val currentResize = PlayerResize.entries.getOrElse(playerHostView?.resizeMode ?: 0) {
+            PlayerResize.Fit
+        }
+        val compressorActive = (player as? CS3IPlayer)?.compressor?.enabled == true
+        updateHudState {
+            copy(
+                durationModeRemaining = playerHostView?.durationMode == true,
+                playbackSpeed = DataStoreHelper.playBackSpeed,
+                resizeMode = currentResize,
+                hideControlNames = hideControlsNames,
+                isRotateEnabled = playerRotateEnabled,
+                isResizeEnabled = playerResizeEnabled,
+                isSpeedEnabled = playBackSpeedEnabled,
+                isCompressorEnabled = playBackCompressorEnabled,
+                isCompressorActive = compressorActive,
+                hasEpisodes = isThereEpisodes(),
+                status = currentPlayerStatus,
+            )
+        }
+
+        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        composeView.setContent {
+            LiquidGlassTheme {
+                val state by hudStateFlow.collectAsState()
+                PlayerHudOverlay(
+                    state = state,
+                    callbacks = callbacks,
+                    contentFrameProvider = {
+                        playerView?.findViewById<View>(androidx.media3.ui.R.id.exo_content_frame)
+                    },
+                )
+            }
+        }
+    }
+
     private fun toggleRotate() {
         activity?.let {
             toggleOrientationWithSensor(it)
@@ -1620,17 +2658,44 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         updateOrientation()
     }
 
+    protected fun dismissEpisodesDrawerWithoutResume() {
+        if (!isShowingEpisodeOverlay) return
+        previousPlayStatus = false
+        isShowingEpisodeOverlay = false
+        if (useComposeHud) {
+            updateHudState { copy(isEpisodesDrawerVisible = false) }
+            animateLayoutChangesForSubtitles()
+        } else {
+            animateEpisodesOverlay(false)
+        }
+    }
+
     private fun toggleEpisodesOverlay(show: Boolean) {
         if (show && !isShowingEpisodeOverlay) {
             previousPlayStatus = player.getIsPlaying()
             player.handleEvent(CSPlayerEvent.Pause)
             showEpisodesOverlay()
             isShowingEpisodeOverlay = true
-            animateEpisodesOverlay(true)
+            if (useComposeHud) {
+                playerHostView?.cancelAutoHide()
+                playerBinding?.playerEpisodeOverlay?.isGone = true
+                updateHudState { copy(isEpisodesDrawerVisible = true) }
+                animateLayoutChangesForSubtitles()
+            } else {
+                animateEpisodesOverlay(true)
+            }
         } else if (isShowingEpisodeOverlay) {
             if (previousPlayStatus) player.handleEvent(CSPlayerEvent.Play)
             isShowingEpisodeOverlay = false
-            animateEpisodesOverlay(false)
+            if (useComposeHud) {
+                updateHudState { copy(isEpisodesDrawerVisible = false) }
+                animateLayoutChangesForSubtitles()
+                if (isShowing) {
+                    autoHide()
+                }
+            } else {
+                animateEpisodesOverlay(false)
+            }
         }
     }
 

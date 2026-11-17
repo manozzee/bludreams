@@ -43,7 +43,6 @@ import com.lagradost.cloudstream3.ui.result.START_ACTION_RESUME_LATEST
 import com.lagradost.cloudstream3.ui.result.getId
 import com.lagradost.cloudstream3.ui.search.SearchClickCallback
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
-import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showOptionSelectStringRes
 import com.lagradost.cloudstream3.utils.AppContextUtils.openBrowser
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream3.utils.DataStoreHelper
@@ -64,6 +63,7 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.base64Encode
 import com.lagradost.cloudstream3.databinding.FragmentHomeBinding
 import com.lagradost.cloudstream3.databinding.HomeEpisodesExpandedBinding
 import com.lagradost.cloudstream3.databinding.HomeSelectMainpageBinding
@@ -729,10 +729,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         var composePage by mutableStateOf<Resource<Map<String, HomeViewModel.ExpandableHomepageList>>?>(homeViewModel.page.value)
         var composePreview by mutableStateOf<Resource<Pair<Boolean, List<LoadResponse>>>?>(homeViewModel.preview.value)
         var composeResumeWatching by mutableStateOf<List<SearchResponse>>(homeViewModel.resumeWatching.value.orEmpty())
-        var composeBookmarks by mutableStateOf<Pair<Boolean, List<SearchResponse>>>(homeViewModel.bookmarks.value ?: (false to emptyList()))
-        var composeAvailableWatchTypes by mutableStateOf<Pair<Set<WatchType>, Set<WatchType>>>(
-            homeViewModel.availableWatchStatusTypes.value ?: (emptySet<WatchType>() to emptySet())
-        )
         var composeCurrentAccount by mutableStateOf<DataStoreHelper.Account?>(homeViewModel.currentAccount.value)
         var composeBookmarkRefreshTick by mutableStateOf(0)
 
@@ -754,9 +750,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
             homePreviewReloadProvider.setOnClickListener {
                 homeViewModel.loadAndCancel(
-                    homeViewModel.apiName.value ?: noneApi.name,
+                    DataStoreHelper.currentHomePage ?: homeViewModel.apiName.value ?: noneApi.name,
                     forceReload = true,
-                    fromUI = true
+                    fromUI = false
                 )
                 showToast(R.string.action_reload, Toast.LENGTH_SHORT)
             }
@@ -871,8 +867,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                             pageResource = composePage,
                             previewResource = composePreview,
                             resumeWatching = composeResumeWatching,
-                            bookmarks = composeBookmarks,
-                            availableWatchStatusTypes = composeAvailableWatchTypes,
                             currentAccount = composeCurrentAccount,
                             onSelectProviderClick = {
                                 context?.selectHomepage(currentApiName) { api ->
@@ -894,8 +888,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                                     loadResp != null -> homeViewModel.click(
                                         LoadClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, loadResp)
                                     )
-                                    searchResp != null -> homeViewModel.click(
-                                        SearchClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, searchResp)
+                                    searchResp != null -> activity?.loadSearchResult(
+                                        searchResp,
+                                        START_ACTION_RESUME_LATEST,
                                     )
                                 }
                             },
@@ -929,42 +924,58 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                                     false
                                 }
                             },
+                            onHeroShareClick = { meta, loadResp, searchResp ->
+                                val ctx = context ?: return@HomeScreen
+                                try {
+                                    val shareApiName = loadResp?.apiName ?: searchResp?.apiName
+                                    val shareUrl = loadResp?.url ?: searchResp?.url
+                                    val shareTitle = loadResp?.name ?: searchResp?.name ?: meta.name
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, shareTitle)
+                                        if (!shareApiName.isNullOrBlank() && !shareUrl.isNullOrBlank()) {
+                                            val nameBase64 = base64Encode(
+                                                shareApiName.toByteArray(Charsets.UTF_8)
+                                            )
+                                            val urlBase64 = base64Encode(
+                                                shareUrl.toByteArray(Charsets.UTF_8)
+                                            )
+                                            val encodedUri = java.net.URLEncoder.encode(
+                                                "${com.lagradost.cloudstream3.syncproviders.AccountManager.APP_STRING_SHARE}:$nameBase64?$urlBase64",
+                                                "UTF-8"
+                                            )
+                                            putExtra(
+                                                Intent.EXTRA_TEXT,
+                                                "https://recloudstream.github.io/csredirect?redirectto=$encodedUri"
+                                            )
+                                        } else if (!shareUrl.isNullOrBlank()) {
+                                            putExtra(Intent.EXTRA_TEXT, "$shareTitle\n$shareUrl")
+                                        } else {
+                                            putExtra(Intent.EXTRA_TEXT, shareTitle)
+                                        }
+                                    }
+                                    ctx.startActivity(Intent.createChooser(intent, shareTitle))
+                                } catch (e: Exception) {
+                                    logError(e)
+                                }
+                            },
                             onLoadMoreHero = {
                                 // Handled automatically by HomeHeroSection
                             },
                             onContinueWatchingClick = { card ->
                                 homeViewModel.click(
-                                    SearchClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, card)
+                                    SearchClickCallback(SEARCH_ACTION_LOAD, homeComposeView, -1, card)
                                 )
                             },
-                            onContinueWatchingLongClick = { card ->
-                                context?.getActivity()?.showOptionSelectStringRes(
-                                    homeComposeView,
-                                    card.posterUrl,
-                                    listOf(
-                                        R.string.action_open_watching,
-                                        R.string.action_remove_watching
-                                    ),
-                                    listOf(
-                                        R.string.action_open_play,
-                                        R.string.action_open_watching,
-                                        R.string.action_remove_watching
-                                    )
-                                ) { (isTv, actionId) ->
-                                    when (actionId + if (isTv) 0 else 1) {
-                                        0 -> homeViewModel.click(
-                                            SearchClickCallback(START_ACTION_RESUME_LATEST, homeComposeView, -1, card)
-                                        )
-                                        1 -> homeViewModel.click(
-                                            SearchClickCallback(SEARCH_ACTION_LOAD, homeComposeView, -1, card)
-                                        )
-                                        2 -> {
-                                            if (card is DataStoreHelper.ResumeWatchingResult) {
-                                                DataStoreHelper.removeLastWatched(card.parentId)
-                                                homeViewModel.reloadStored()
-                                            }
-                                        }
-                                    }
+                            onContinueWatchingPlayClick = { card ->
+                                homeViewModel.click(
+                                    SearchClickCallback(SEARCH_ACTION_PLAY_FILE, homeComposeView, -1, card)
+                                )
+                            },
+                            onContinueWatchingRemoveClick = { card ->
+                                if (card is DataStoreHelper.ResumeWatchingResult) {
+                                    DataStoreHelper.removeLastWatched(card.parentId)
+                                    homeViewModel.reloadStored()
                                 }
                             },
                             onContinueWatchingViewAll = {
@@ -983,28 +994,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                                     }
                                 )
                             },
-                            onWatchTypeToggle = { selectedSet ->
-                                homeViewModel.loadStoredData(selectedSet)
-                            },
-                            onBookmarksViewAll = { title, list ->
-                                homeViewModel.popup(
-                                    HomeViewModel.ExpandableHomepageList(
-                                        HomePageList(title, list, false),
-                                        1,
-                                        false
-                                    ),
-                                    deleteCallback = {
-                                        homeViewModel.deleteBookmarks(list)
-                                    }
-                                )
-                            },
                             onCatalogItemClick = { card ->
                                 homeViewModel.click(
                                     SearchClickCallback(SEARCH_ACTION_LOAD, homeComposeView, -1, card)
                                 )
-                            },
-                            onCatalogItemLongClick = { card ->
-                                (activity as? MainActivity)?.loadPopup(card, load = false)
                             },
                             onCatalogViewAllClick = { section ->
                                 homeViewModel.popup(section)
@@ -1033,12 +1026,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             }
             observe(homeViewModel.resumeWatching) { resumeData ->
                 composeResumeWatching = resumeData
-            }
-            observe(homeViewModel.bookmarks) { bookmarksData ->
-                composeBookmarks = bookmarksData
-            }
-            observe(homeViewModel.availableWatchStatusTypes) { watchTypesData ->
-                composeAvailableWatchTypes = watchTypesData
             }
             observe(homeViewModel.currentAccount) { accountData ->
                 composeCurrentAccount = accountData

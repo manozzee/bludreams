@@ -1,23 +1,32 @@
 package com.lagradost.cloudstream3.ui.liquidglass
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
+import android.content.Context
+import android.util.LruCache
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
@@ -26,11 +35,10 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.lagradost.cloudstream3.ui.AppIcons as Icons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -39,44 +47,66 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.palette.graphics.Palette
+import coil3.SingletonImageLoader
+import coil3.asDrawable
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.CoroutineScope
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import com.lagradost.cloudstream3.ui.AppIcons as Icons
+import com.lagradost.cloudstream3.utils.UIHelper.getStatusBarHeight
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-private const val HERO_BACKGROUND_PARALLAX = 0.055f
 internal const val HERO_BACKGROUND_SCALE = 1.14f
-private const val HERO_CONTENT_PARALLAX = 0.18f
 private const val HERO_SCROLL_PARALLAX = 0.3f
 private const val HERO_SCROLL_DOWN_SCALE_MULTIPLIER = 0.0001f
 private const val HERO_SCROLL_UP_SCALE_MULTIPLIER = 0.002f
 private const val HERO_SCROLL_MAX_SCALE = 1.3f
-private const val HERO_SWIPE_THRESHOLD_FRACTION = 0.16f
-private const val HERO_SWIPE_VELOCITY_THRESHOLD = 300f
-private const val HERO_AUTO_SCROLL_INTERVAL_MS = 8_000L
+
+private const val HERO_AUTO_SCROLL_INTERVAL_MS = 6_000L
+private const val HERO_PARALLAX_PX = 22f
+private const val HERO_TITLE_REVEAL_DURATION_MS = 200
+
 private const val MOBILE_HERO_VIEWPORT_RATIO = 0.70f
 private const val MOBILE_HERO_MIN_HEIGHT_DP = 306f
 private const val MOBILE_HERO_MAX_HEIGHT_DP = 646f
+
+private val HeroSurfaceDark = Color(0xFF17171A)
+private val HeroTextPrimary = Color(0xFFF5F5F7)
+
+private val heroPaletteColorCache = LruCache<String, Int>(24)
 
 internal data class HomeHeroLayout(
     val isTablet: Boolean,
@@ -99,7 +129,7 @@ fun Modifier.heroStretchHeight(baseHeight: Dp, stretchPx: () -> Float): Modifier
     }
 
 fun Modifier.heroStretchZoom(stretchPx: () -> Float): Modifier = graphicsLayer {
-    val zoom = 1f + stretchPx().coerceAtLeast(0f) / size.height.coerceAtLeast(1f)
+    val zoom = 1f + (stretchPx().coerceAtLeast(0f) / size.height.coerceAtLeast(1f))
     transformOrigin = TransformOrigin(0.5f, 0f)
     scaleX = zoom
     scaleY = zoom
@@ -109,13 +139,39 @@ fun Modifier.heroStretchZoom(stretchPx: () -> Float): Modifier = graphicsLayer {
 fun HomeHeroSection(
     items: List<MetaPreview>,
     modifier: Modifier = Modifier,
-    viewportHeight: Dp? = null,
-    mobileBelowSectionHeightHint: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") viewportHeight: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") mobileBelowSectionHeightHint: Dp? = null,
     listState: LazyListState? = null,
     stretchPx: () -> Float = { 0f },
-    showImdbRating: Boolean = true,
-    showMdbListRatings: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") showImdbRating: Boolean = true,
+    @Suppress("UNUSED_PARAMETER") showMdbListRatings: Boolean = false,
     onItemClick: ((MetaPreview) -> Unit)? = null,
+    onPlayClick: ((MetaPreview) -> Unit)? = null,
+    onBookmarkClick: ((MetaPreview) -> Unit)? = null,
+    isBookmarked: ((MetaPreview) -> Boolean)? = null,
+    @Suppress("UNUSED_PARAMETER") onShareClick: ((MetaPreview) -> Unit)? = null,
+    onNearEndReached: (() -> Unit)? = null,
+) {
+    HeroPosterCarouselSection(
+        items = items,
+        modifier = modifier,
+        listState = listState,
+        stretchPx = stretchPx,
+        onDetailsClick = onItemClick,
+        onPlayClick = onPlayClick,
+        onBookmarkClick = onBookmarkClick,
+        isBookmarked = isBookmarked,
+        onNearEndReached = onNearEndReached,
+    )
+}
+
+@Composable
+fun HeroPosterCarouselSection(
+    items: List<MetaPreview>,
+    modifier: Modifier = Modifier,
+    listState: LazyListState? = null,
+    stretchPx: () -> Float = { 0f },
+    onDetailsClick: ((MetaPreview) -> Unit)? = null,
     onPlayClick: ((MetaPreview) -> Unit)? = null,
     onBookmarkClick: ((MetaPreview) -> Unit)? = null,
     isBookmarked: ((MetaPreview) -> Boolean)? = null,
@@ -126,315 +182,462 @@ fun HomeHeroSection(
     val pagerState = key(items.size) {
         rememberPagerState(
             initialPage = if (items.size > 1) {
-                Int.MAX_VALUE / 2 - (Int.MAX_VALUE / 2) % items.size
+                (Int.MAX_VALUE / 2) - ((Int.MAX_VALUE / 2) % items.size)
             } else {
                 0
             },
             pageCount = { if (items.size > 1) Int.MAX_VALUE else 1 },
         )
     }
+
     val coroutineScope = rememberCoroutineScope()
-    val autoScrollPage = pagerState.settledPage
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    var isUserTouching by remember { mutableStateOf(false) }
 
-    LaunchedEffect(pagerState) {
-        pagerState.scrollToPage(pagerState.currentPage)
+    val currentItemIndex = (((pagerState.currentPage % items.size) + items.size) % items.size)
+        .coerceIn(0, items.lastIndex)
+    val targetItemIndex = (((pagerState.targetPage % items.size) + items.size) % items.size)
+        .coerceIn(0, items.lastIndex)
+    val displayItemIndex = if (pagerState.isScrollInProgress) targetItemIndex else currentItemIndex
+    val displayItem = items[displayItemIndex]
+    val activeImageUrl = resolvePosterImageUrl(displayItem)
+
+    val isScrolledPastHero by remember(listState) {
+        derivedStateOf {
+            listState != null && (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 280)
+        }
     }
+    val isFeedScrolling by remember(listState) {
+        derivedStateOf { listState?.isScrollInProgress == true }
+    }
+    val isPagerDragged by pagerState.interactionSource.collectIsDraggedAsState()
+    val isAutoAdvancePaused by rememberUpdatedState(
+        isUserTouching || isPagerDragged || isFeedScrolling || isScrolledPastHero,
+    )
 
-    LaunchedEffect(autoScrollPage, items.size) {
-        if (items.isNotEmpty() && (autoScrollPage % items.size) >= items.size - 1) {
+    LaunchedEffect(pagerState.settledPage, items.size) {
+        if (items.size <= 1) return@LaunchedEffect
+        val settledItemIndex = (((pagerState.settledPage % items.size) + items.size) % items.size)
+            .coerceIn(0, items.lastIndex)
+        if (settledItemIndex >= items.size - 1) {
             onNearEndReached?.invoke()
         }
-        if (items.size <= 1) return@LaunchedEffect
-        delay(HERO_AUTO_SCROLL_INTERVAL_MS)
-        while (pagerState.isScrollInProgress) {
-            delay(100L)
-        }
-
-        val nextPage = pagerState.currentPage + 1
-        pagerState.animateScrollToPage(nextPage)
     }
+
+    LaunchedEffect(pagerState, items.size) {
+        if (items.size <= 1) return@LaunchedEffect
+        var lastObservedPage = pagerState.currentPage
+        var idleElapsedMs = 0L
+        val stepMs = 200L
+        while (true) {
+            delay(stepMs)
+            val currentPage = pagerState.currentPage
+            if (currentPage != lastObservedPage) {
+                lastObservedPage = currentPage
+                idleElapsedMs = 0L
+            }
+            if (isAutoAdvancePaused || pagerState.isScrollInProgress) {
+                idleElapsedMs = 0L
+                continue
+            }
+            idleElapsedMs += stepMs
+            if (idleElapsedMs >= HERO_AUTO_SCROLL_INTERVAL_MS) {
+                idleElapsedMs = 0L
+                val nextPage = (currentPage + 1).coerceAtMost(Int.MAX_VALUE - 1)
+                pagerState.animateScrollToPage(
+                    page = nextPage,
+                    animationSpec = tween(durationMillis = 550, easing = FastOutSlowInEasing),
+                )
+                lastObservedPage = pagerState.currentPage
+            }
+        }
+    }
+
+    var extractedPosterColor by remember { mutableStateOf<Color?>(null) }
+    LaunchedEffect(activeImageUrl) {
+        if (activeImageUrl.isNullOrBlank()) {
+            extractedPosterColor = null
+            return@LaunchedEffect
+        }
+        heroPaletteColorCache.get(activeImageUrl)?.let { cachedArgb ->
+            extractedPosterColor = Color(cachedArgb)
+            return@LaunchedEffect
+        }
+        extractedPosterColor = extractPosterGradientColor(context, activeImageUrl)
+    }
+
+    val backgroundColor = MaterialTheme.colorScheme.background
+    val fallbackAccentColor = MaterialTheme.colorScheme.primary
+    val animatedBackdropColor by animateColorAsState(
+        targetValue = extractedPosterColor ?: fallbackAccentColor,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        label = "heroBackdropExtractedColor",
+    )
+
+    val view = LocalView.current
+    val fallbackTopInsetDp = remember(view, density, context) {
+        val rootTopPx = ViewCompat.getRootWindowInsets(view)
+            ?.getInsets(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout())
+            ?.top ?: 0
+        val dimenTopPx = context.getStatusBarHeight()
+        with(density) { maxOf(rootTopPx, dimenTopPx).toDp() }
+    }
+    val composeStatusBarTopDp = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+    val effectiveTopInsetDp = maxOf(fallbackTopInsetDp, composeStatusBarTopDp)
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .homeHeroPagerGesture(
-                pagerState = pagerState,
-                itemCount = items.size,
-                coroutineScope = coroutineScope,
-            )
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)),
+            .background(backgroundColor)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0.0f to animatedBackdropColor.copy(alpha = 0.55f),
+                        0.48f to animatedBackdropColor.copy(alpha = 0.22f),
+                        0.86f to animatedBackdropColor.copy(alpha = 0.04f),
+                        1.0f to Color.Transparent,
+                    ),
+                )
+            }
+            .pointerInput(Unit) {
+                try {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            isUserTouching = event.changes.any { it.pressed }
+                        }
+                    }
+                } finally {
+                    isUserTouching = false
+                }
+            },
     ) {
-        val layout = homeHeroLayout(
-            maxWidthDp = maxWidth.value,
-            viewportHeightDp = viewportHeight?.value,
-            mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
-        )
-        val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
-        val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
-        val scrollOffsetPx by remember(listState, heroHeightPx) {
-            derivedStateOf {
-                when {
-                    listState == null -> 0f
-                    listState.firstVisibleItemIndex > 0 -> heroHeightPx
-                    else -> listState.firstVisibleItemScrollOffset.toFloat()
-                }
-            }
+        val pagerHorizontalPadding = when {
+            maxWidth >= 840.dp -> ((maxWidth - 280.dp) / 2f).coerceAtLeast(64.dp)
+            maxWidth >= 600.dp -> ((maxWidth - 260.dp) / 2f).coerceAtLeast(64.dp)
+            else -> (maxWidth * 0.175f).coerceIn(60.dp, 76.dp)
         }
-        val currentPage = pagerState.currentPage
-        val visiblePages = listOf(
-            currentPage,
-            (currentPage - 1).coerceAtLeast(0),
-            (currentPage + 1).coerceAtMost(pagerState.pageCount - 1),
-        ).distinct()
-            .mapNotNull { index ->
-                val pageOffset = heroPageOffset(pagerState, index)
-                val visibility = (1f - abs(pageOffset)).coerceIn(0f, 1f)
-                if (visibility <= 0f) {
-                    null
-                } else {
-                    HeroPageLayer(
-                        itemIndex = index % items.size,
-                        visibility = visibility,
-                        offset = pageOffset,
-                    )
-                }
-            }
-            .sortedBy(HeroPageLayer::visibility)
-        val currentItem = visiblePages
-            .lastOrNull()
-            ?.itemIndex
-            ?.let(items::get)
-            ?: items[currentPage % items.size]
+        val belowCardHorizontalPadding = if (maxWidth >= 600.dp) pagerHorizontalPadding else 24.dp
+        val stretchScale =
+            1f + (stretchPx().coerceAtLeast(0f) / with(density) { 2600.dp.toPx() }).coerceIn(0f, 0.05f)
 
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = effectiveTopInsetDp + 8.dp, bottom = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // Minimal Top Header ("Home" only)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = "Home",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontFamily = PlusJakartaSansFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        lineHeight = 30.sp,
+                    ),
+                    color = HeroTextPrimary,
+                    maxLines = 1,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Frameless Portrait Poster Carousel
+            HorizontalPager(
+                state = pagerState,
+                contentPadding = PaddingValues(horizontal = pagerHorizontalPadding),
+                pageSpacing = 12.dp,
+                beyondViewportPageCount = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(0.5f, 0f)
+                        scaleX = stretchScale
+                        scaleY = stretchScale
+                    },
+            ) { page ->
+                val itemIndex = ((page % items.size) + items.size) % items.size
+                val item = items[itemIndex]
+
+                FramelessHeroPosterCard(
+                    item = item,
+                    pagerState = pagerState,
+                    page = page,
+                    onDetailsClick = onDetailsClick?.let { { it(item) } },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.72f),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Clean Under-Poster Title & Action Row (Zero Liquid Glass)
+//            HeroUnderPosterFooter(
+//                item = displayItem,
+//                itemCount = items.size,
+//                activeItemIndex = displayItemIndex,
+//                isBookmarked = isBookmarked?.invoke(displayItem) == true,
+//                onDetailsClick = onDetailsClick?.let { { it(displayItem) } },
+//                onPlayClick = onPlayClick?.let { { it(displayItem) } }
+//                    ?: onDetailsClick?.let { { it(displayItem) } },
+//                onBookmarkClick = onBookmarkClick?.let { { it(displayItem) } },
+//                onDotClick = { targetIndex ->
+//                    if (items.size > 1) {
+//                        coroutineScope.launch {
+//                            pagerState.animateScrollToPage(
+//                                heroPageForItem(pagerState.currentPage, targetIndex, items.size),
+//                            )
+//                        }
+//                    }
+//                },
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(horizontal = belowCardHorizontalPadding),
+//            )
+        }
+    }
+}
+
+@Composable
+private fun FramelessHeroPosterCard(
+    item: MetaPreview,
+    pagerState: PagerState,
+    page: Int,
+    onDetailsClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val posterShape = remember { RoundedCornerShape(22.dp) }
+    val imageUrl = resolvePosterImageUrl(item)
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                val pageOffset = heroPageOffset(pagerState, page)
+                val absOffset = abs(pageOffset).coerceIn(0f, 1f)
+                val cardScale = lerpFloat(1.0f, 0.90f, absOffset)
+                val cardAlpha = lerpFloat(1.0f, 0.60f, absOffset)
+                scaleX = cardScale
+                scaleY = cardScale
+                alpha = cardAlpha
+            }
+            .shadow(
+                elevation = 12.dp,
+                shape = posterShape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = 0.55f),
+                spotColor = Color.Black.copy(alpha = 0.70f),
+            )
+            .clip(posterShape)
+            .background(HeroSurfaceDark)
+            .clickable(enabled = onDetailsClick != null) { onDetailsClick?.invoke() },
+    ) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = item.name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val pageOffset = heroPageOffset(pagerState, page)
+                    scaleX = 1.05f
+                    scaleY = 1.05f
+                    translationX = pageOffset * HERO_PARALLAX_PX
+                },
+        )
+    }
+}
+
+@Composable
+private fun HeroUnderPosterFooter(
+    item: MetaPreview,
+    itemCount: Int,
+    activeItemIndex: Int,
+    isBookmarked: Boolean,
+    onDetailsClick: (() -> Unit)?,
+    onPlayClick: (() -> Unit)?,
+    onBookmarkClick: (() -> Unit)?,
+    onDotClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val titleRevealAnim = remember { Animatable(1f) }
+    var hasRenderedInitial by remember { mutableStateOf(false) }
+
+    LaunchedEffect(activeItemIndex, item.stableKey()) {
+        if (!hasRenderedInitial) {
+            hasRenderedInitial = true
+            titleRevealAnim.snapTo(1f)
+        } else {
+            titleRevealAnim.snapTo(0f)
+            titleRevealAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = HERO_TITLE_REVEAL_DURATION_MS,
+                    easing = FastOutSlowInEasing,
+                ),
+            )
+        }
+    }
+
+    var logoLoadFailed by remember(item.stableKey(), item.logo) { mutableStateOf(false) }
+    val logoUrl = item.logo?.takeIf { it.isNotBlank() }
+
+    val accentColor = MaterialTheme.colorScheme.primary
+    val onAccentColor = MaterialTheme.colorScheme.onPrimary
+    val bookmarkIconTint by animateColorAsState(
+        targetValue = if (isBookmarked) accentColor else HeroTextPrimary,
+        animationSpec = tween(durationMillis = 180),
+        label = "heroMinimalBookmarkTint",
+    )
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.Start,
+    ) {
+        // Title Logo or 1-Line Fallback
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heroStretchHeight(layout.heroHeight, stretchPx),
+                .graphicsLayer {
+                    val p = titleRevealAnim.value.coerceIn(0f, 1f)
+                    alpha = p
+                    translationY = (1f - p) * 6.dp.toPx()
+                },
+            contentAlignment = Alignment.CenterStart,
         ) {
-            HorizontalPager(
-                state = pagerState,
-                userScrollEnabled = false,
+            if (logoUrl != null && !logoLoadFailed) {
+                AsyncImage(
+                    model = logoUrl,
+                    contentDescription = item.name,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    onError = { logoLoadFailed = true },
+                    modifier = Modifier
+                        .height(34.dp)
+                        .widthIn(max = 200.dp)
+                        .clickable(enabled = onDetailsClick != null) { onDetailsClick?.invoke() },
+                )
+            } else {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = PlusJakartaSansFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        lineHeight = 24.sp,
+                    ),
+                    color = HeroTextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = onDetailsClick != null) { onDetailsClick?.invoke() },
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Minimal Action & Indicator Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // Solid Accent Play Pill (40.dp height, 20.dp radius)
+            val playInteractionSource = remember { MutableInteractionSource() }
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = 0.01f },
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(accentColor)
+                    .clickable(
+                        enabled = onPlayClick != null,
+                        interactionSource = playInteractionSource,
+                        indication = ripple(color = onAccentColor),
+                        onClick = { onPlayClick?.invoke() },
+                    )
+                    .padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Box(modifier = Modifier.fillMaxSize())
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = onAccentColor,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = "Play",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontFamily = PlusJakartaSansFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                    ),
+                    color = onAccentColor,
+                    maxLines = 1,
+                )
             }
 
+            // Simple Solid Dark Bookmark Circle (40.dp, #17171A, no glass/blur)
+            val bookmarkInteractionSource = remember { MutableInteractionSource() }
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(HeroSurfaceDark)
+                    .clickable(
+                        enabled = onBookmarkClick != null,
+                        interactionSource = bookmarkInteractionSource,
+                        indication = ripple(color = Color.White),
+                        onClick = { onBookmarkClick?.invoke() },
+                    ),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(layout.heroHeight)
-                        .heroStretchZoom(stretchPx),
+                Icon(
+                    imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                    contentDescription = "Bookmark",
+                    tint = bookmarkIconTint,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Minimal Page Indicator Dots
+            if (itemCount > 1) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    visiblePages.forEach { layer ->
-                        AsyncImage(
-                            model = items[layer.itemIndex].banner ?: items[layer.itemIndex].poster,
-                            contentDescription = items[layer.itemIndex].name,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    val offset = scrollOffsetPx
-                                    val scrollScale = heroBackgroundScrollScale(offset)
-                                    alpha = layer.visibility
-                                    translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                                    translationY = heroBackgroundScrollTranslationY(offset)
-                                    scaleX = HERO_BACKGROUND_SCALE * scrollScale
-                                    scaleY = HERO_BACKGROUND_SCALE * scrollScale
-                                },
-                            alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
-                            contentScale = ContentScale.Crop,
+                    repeat(itemCount) { index ->
+                        val isActive = index == activeItemIndex
+                        val dotWidth by animateDpAsState(
+                            targetValue = if (isActive) 16.dp else 6.dp,
+                            animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f),
+                            label = "heroMinimalDotWidth",
                         )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.02f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.78f),
-                                ),
-                            ),
-                        ),
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(layout.bottomFadeHeight)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0f),
-                                    MaterialTheme.colorScheme.background,
-                                ),
-                            ),
-                        ),
-                )
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = layout.contentHorizontalPadding)
-                        .padding(vertical = layout.contentVerticalPadding),
-                    horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(layout.contentWidthFraction)
-                            .widthIn(max = layout.contentMaxWidth),
-                        contentAlignment = Alignment.BottomStart,
-                    ) {
-                        visiblePages.forEach { layer ->
-                            val item = items[layer.itemIndex]
-                            key(item.stableKey()) {
-                                Box(
-                                    modifier = Modifier.graphicsLayer {
-                                        alpha = layer.visibility
-                                        translationX = -layer.offset * heroWidthPx * HERO_CONTENT_PARALLAX
-                                    },
-                                ) {
-                                    HeroContentBlock(
-                                        item = item,
-                                        layout = layout,
-                                        showImdbRating = showImdbRating,
-                                        showMdbListRatings = showMdbListRatings,
-                                        onItemClick = onItemClick,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (onPlayClick != null) {
-                            Surface(
-                                modifier = Modifier
-                                    .clickable {
-                                        onPlayClick.invoke(currentItem)
-                                    },
-                                color = MaterialTheme.colorScheme.onBackground,
-                                contentColor = MaterialTheme.colorScheme.background,
-                                shape = RoundedCornerShape(40.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 9.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = "Play",
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                    Text(
-                                        text = "Play",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                            }
-                        }
-
-                        Surface(
+                        val dotColor by animateColorAsState(
+                            targetValue = if (isActive) HeroTextPrimary else Color.White.copy(alpha = 0.28f),
+                            animationSpec = tween(durationMillis = 200),
+                            label = "heroMinimalDotColor",
+                        )
+                        Box(
                             modifier = Modifier
-                                .clickable(enabled = onItemClick != null) {
-                                    onItemClick?.invoke(currentItem)
-                                },
-                            color = if (onPlayClick != null) {
-                                Color.White.copy(alpha = 0.14f)
-                            } else {
-                                MaterialTheme.colorScheme.onBackground
-                            },
-                            contentColor = if (onPlayClick != null) {
-                                MaterialTheme.colorScheme.onBackground
-                            } else {
-                                MaterialTheme.colorScheme.background
-                            },
-                            border = if (onPlayClick != null) {
-                                BorderStroke(1.dp, Color.White.copy(alpha = 0.24f))
-                            } else {
-                                null
-                            },
-                            shape = RoundedCornerShape(40.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = if (onPlayClick != null) 18.dp else 24.dp,
-                                    vertical = if (onPlayClick != null) 9.dp else 10.dp,
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                if (onPlayClick != null) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = "View Details",
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
-                                Text(
-                                    text = "View Details",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                        }
-
-                        if (onBookmarkClick != null) {
-                            val bookmarked = isBookmarked?.invoke(currentItem) == true
-                            CircularActionButton(
-                                icon = if (bookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Bookmark",
-                                isActive = bookmarked,
-                                onClick = { onBookmarkClick.invoke(currentItem) },
-                            )
-                        }
-                    }
-
-                    if (items.size > 1) {
-                        Spacer(modifier = Modifier.height(if (layout.isTablet) 12.dp else 10.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            items.forEachIndexed { index, _ ->
-                                val activeFraction = visiblePages
-                                    .firstOrNull { it.itemIndex == index }
-                                    ?.visibility ?: 0f
-                                Box(
-                                    modifier = Modifier
-                                        .clickable {
-                                            coroutineScope.launch {
-                                                pagerState.animateScrollToPage(
-                                                    heroPageForItem(pagerState.currentPage, index, items.size),
-                                                )
-                                            }
-                                        }
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.onBackground)
-                                        .graphicsLayer {
-                                            alpha = 0.35f + (0.57f * activeFraction)
-                                        }
-                                        .width(8.dp + (24.dp * activeFraction))
-                                        .height(8.dp),
-                                )
-                            }
-                        }
+                                .width(dotWidth)
+                                .height(6.dp)
+                                .clip(CircleShape)
+                                .background(dotColor)
+                                .clickable { onDotClick(index) },
+                        )
                     }
                 }
             }
@@ -442,16 +645,61 @@ fun HomeHeroSection(
     }
 }
 
-private data class HeroPageLayer(
-    val itemIndex: Int,
-    val visibility: Float,
-    val offset: Float,
-)
+private fun resolvePosterImageUrl(item: MetaPreview): String? =
+    item.poster?.takeIf { it.isNotBlank() }
+        ?: item.rawPosterUrl?.takeIf { it.isNotBlank() }
+        ?: item.banner?.takeIf { it.isNotBlank() }
+        ?: item.landscapePoster
+
+internal suspend fun extractPosterGradientColor(
+    context: Context,
+    imageUrl: String,
+): Color? {
+    heroPaletteColorCache.get(imageUrl)?.let { cachedArgb ->
+        return Color(cachedArgb)
+    }
+
+    return withContext(Dispatchers.IO) {
+        runCatching {
+            val imageLoader = SingletonImageLoader.get(context)
+            val request = ImageRequest.Builder(context)
+                .data(imageUrl)
+                .allowHardware(false)
+                .size(128)
+                .build()
+            val result = imageLoader.execute(request) as? SuccessResult ?: return@runCatching null
+            val bitmap = result.image.asDrawable(context.resources).toBitmap()
+            val palette = withContext(Dispatchers.Default) {
+                Palette.from(bitmap).maximumColorCount(12).generate()
+            }
+            val candidateSwatches = listOfNotNull(
+                palette.vibrantSwatch,
+                palette.mutedSwatch,
+                palette.darkVibrantSwatch,
+                palette.lightVibrantSwatch,
+                palette.dominantSwatch,
+            )
+            val chosenSwatch = candidateSwatches.firstOrNull { swatch ->
+                val color = Color(swatch.rgb)
+                val hsv = FloatArray(3)
+                android.graphics.Color.colorToHSV(swatch.rgb, hsv)
+                color.luminance() >= 0.02f && hsv[1] >= 0.12f
+            } ?: candidateSwatches.firstOrNull { Color(it.rgb).luminance() >= 0.015f }
+                ?: candidateSwatches.firstOrNull()
+            val rgb = chosenSwatch?.rgb ?: return@runCatching null
+            heroPaletteColorCache.put(imageUrl, rgb)
+            Color(rgb)
+        }.getOrNull()
+    }
+}
 
 private fun heroPageOffset(
     pagerState: PagerState,
     page: Int,
 ): Float = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+
+private fun lerpFloat(start: Float, stop: Float, fraction: Float): Float =
+    start + (stop - start) * fraction
 
 internal fun heroPageForItem(currentPage: Int, itemIndex: Int, itemCount: Int): Int {
     val page = currentPage.toLong() - currentPage % itemCount + itemIndex
@@ -459,66 +707,6 @@ internal fun heroPageForItem(currentPage: Int, itemIndex: Int, itemCount: Int): 
         .filter { it in 0L until Int.MAX_VALUE.toLong() }
         .minBy { abs(it - currentPage) }
         .toInt()
-}
-
-@Composable
-private fun HeroContentBlock(
-    item: MetaPreview,
-    layout: HomeHeroLayout,
-    showImdbRating: Boolean,
-    showMdbListRatings: Boolean,
-    onItemClick: ((MetaPreview) -> Unit)?,
-) {
-    var logoLoadError by remember(item.type, item.id, item.logo) {
-        mutableStateOf(false)
-    }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(),
-        horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,
-    ) {
-        if (logoUrl != null && !logoLoadError) {
-            AsyncImage(
-                model = logoUrl,
-                contentDescription = item.name,
-                modifier = Modifier
-                    .fillMaxWidth(layout.logoWidthFraction)
-                    .aspectRatio(2.6f)
-                    .clickable(enabled = onItemClick != null) {
-                        onItemClick?.invoke(item)
-                    },
-                alignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
-                contentScale = ContentScale.Fit,
-                onError = { logoLoadError = true },
-            )
-        } else {
-            Text(
-                text = item.name,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = onItemClick != null) {
-                        onItemClick?.invoke(item)
-                    },
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = if (layout.isTablet) TextAlign.Start else TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-        HomeHeroMetaRows(
-            item = item,
-            isTablet = layout.isTablet,
-            showImdbRating = showImdbRating,
-            showMdbListRatings = showMdbListRatings,
-        )
-    }
 }
 
 internal fun homeHeroLayout(
@@ -617,87 +805,4 @@ internal fun heroBackgroundScrollScale(scrollOffsetPx: Float): Float {
 
 internal fun heroBackgroundScrollTranslationY(scrollOffsetPx: Float): Float {
     return scrollOffsetPx * HERO_SCROLL_PARALLAX
-}
-
-private fun Modifier.homeHeroPagerGesture(
-    pagerState: PagerState,
-    itemCount: Int,
-    coroutineScope: CoroutineScope,
-): Modifier {
-    if (itemCount <= 1) return this
-
-    return pointerInput(pagerState, itemCount) {
-        awaitEachGesture {
-            val down = awaitFirstDown(pass = PointerEventPass.Initial)
-            val widthPx = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
-            val velocityTracker = VelocityTracker().apply {
-                addPosition(down.uptimeMillis, down.position)
-            }
-            val startPage = pagerState.currentPage
-            var totalDx = 0f
-            var totalDy = 0f
-            var dragging = false
-
-            while (true) {
-                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                velocityTracker.addPosition(change.uptimeMillis, change.position)
-
-                if (!change.pressed) {
-                    if (dragging) {
-                        val targetPage = resolveHeroTargetPage(
-                            startPage = startPage,
-                            pageCount = pagerState.pageCount,
-                            totalDx = totalDx,
-                            velocityX = velocityTracker.calculateVelocity().x,
-                            widthPx = widthPx,
-                        )
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(targetPage)
-                        }
-                    }
-                    break
-                }
-
-                val delta = change.position - change.previousPosition
-                totalDx += delta.x
-                totalDy += delta.y
-
-                if (!dragging) {
-                    val horizontalDrag =
-                        abs(totalDx) > viewConfiguration.touchSlop && abs(totalDx) > abs(totalDy)
-                    val verticalDrag =
-                        abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
-
-                    when {
-                        verticalDrag -> break
-                        horizontalDrag -> dragging = true
-                        else -> continue
-                    }
-                }
-
-                pagerState.dispatchRawDelta(-delta.x)
-                change.consume()
-            }
-        }
-    }
-}
-
-private fun resolveHeroTargetPage(
-    startPage: Int,
-    pageCount: Int,
-    totalDx: Float,
-    velocityX: Float,
-    widthPx: Float,
-): Int {
-    val thresholdPassed = abs(totalDx) > widthPx * HERO_SWIPE_THRESHOLD_FRACTION ||
-        abs(velocityX) > HERO_SWIPE_VELOCITY_THRESHOLD
-    if (!thresholdPassed) return startPage
-
-    val currentPage = startPage.coerceIn(0, pageCount - 1)
-    return when {
-        totalDx > 0f -> (currentPage - 1).coerceAtLeast(0)
-        totalDx < 0f -> (currentPage + 1).coerceAtMost(pageCount - 1)
-        else -> currentPage
-    }
 }

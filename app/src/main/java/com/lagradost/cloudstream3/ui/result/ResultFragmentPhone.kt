@@ -29,7 +29,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.preference.PreferenceManager
-import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
 import android.app.Activity
 import com.lagradost.cloudstream3.TvType
@@ -1788,9 +1787,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                         SearchHelper.handleSearchClickCallback(
                             SearchClickCallback(SEARCH_ACTION_LOAD, binding.resultComposeView, -1, rec)
                         )
-                    },
-                    onRecommendationLongClick = { rec ->
-                        (activity as? MainActivity)?.loadPopup(rec, load = false)
                     },
                     onTrailerClick = { trailer ->
                         val titleStr = (composeState.page as? Resource.Success<ResultData>)?.value?.let {

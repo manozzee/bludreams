@@ -33,7 +33,7 @@
             android:alpha="0.4"
             android:contentDescription="@string/profile_background_des"
             android:scaleType="centerCrop"
-            tools:src="@drawable/profile_bg_teal" />
+            tools:src="@drawable/bg_color_both" />
 
         <View
             android:id="@+id/outline"

@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,15 +54,13 @@ import com.lagradost.cloudstream3.SearchQuality
 import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.ui.clear
 import com.lagradost.cloudstream3.ui.home.HomeChildItemAdapter
-import com.lagradost.cloudstream3.APIHolder
-import com.lagradost.cloudstream3.ui.APIRepository.Companion.noneApi
-import com.lagradost.cloudstream3.ui.APIRepository.Companion.randomApi
-import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
-import com.lagradost.cloudstream3.ui.home.HomeFragment
+import com.lagradost.cloudstream3.ui.home.HomeFragment.Companion.getDisplayName
+import com.lagradost.cloudstream3.ui.home.HomeFragment.Companion.selectHomepage
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.ui.home.ParentItemAdapter
 import com.lagradost.cloudstream3.ui.search.SearchAdapter
 import com.lagradost.cloudstream3.ui.settings.Globals.updateTv
+import com.lagradost.cloudstream3.utils.UIHelper.setNavigationBarColorCompat
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import com.lagradost.cloudstream4.compose.TV
 import com.lagradost.cloudstream4.compose.isLayout
@@ -113,6 +113,7 @@ object SettingsUIScreen : SearchableSettings {
     override fun getPreferences(): List<Preference> {
         val settings = rememberAppSettings()
         val context = LocalContext.current
+        var currentHomePage by remember { mutableStateOf(DataStoreHelper.currentHomePage) }
         val posterStyle by remember(context) {
             PosterCardStyleRepository.ensureLoaded(context)
             PosterCardStyleRepository.state
@@ -155,14 +156,13 @@ object SettingsUIScreen : SearchableSettings {
                         preference = settings.ui.pureBlack,
                         icon = painterResource(R.drawable.palette_24px),
                         title = stringResource(R.string.pure_black_settings),
-                        subtitle = stringResource(R.string.pure_black_settings_des),
                         onValueChanged = { newValue ->
                             settings.ui.pureBlack.set(newValue)
                             activity?.let { act ->
                                 CommonActivity.loadThemes(act)
-                                act.recreate()
+                                act.setNavigationBarColorCompat(R.attr.primaryBlackBackground)
                             }
-                            true
+                            false
                         }),
                     Preference.PreferenceItem.ListPreference(
                         preference = settings.ui.layout,
@@ -264,24 +264,14 @@ object SettingsUIScreen : SearchableSettings {
                     Preference.PreferenceItem.TextPreference(
                         icon = painterResource(R.drawable.filter_alt_24px),
                         title = stringResource(R.string.home_page_source_title),
-                        subtitle = DataStoreHelper.currentHomePage ?: stringResource(R.string.none),
+                        subtitle = context.getDisplayName(currentHomePage)
+                            ?: (currentHomePage ?: stringResource(R.string.none)),
                         onClick = {
-                            activity?.let { ctx ->
-                                val apis = APIHolder.apis.map { it.name }.toMutableList()
-                                apis.add(0, randomApi.name)
-                                apis.add(0, noneApi.name)
-                                val current = DataStoreHelper.currentHomePage
-                                ctx.showBottomDialog(
-                                    apis,
-                                    apis.indexOf(current),
-                                    ctx.getString(R.string.home_page_source_title),
-                                    true,
-                                    {},
-                                ) { index ->
-                                    val selected = apis.getOrNull(index) ?: return@showBottomDialog
-                                    DataStoreHelper.currentHomePage = selected
-                                    ctx.recreate()
-                                }
+                            val ctx = activity ?: context
+                            ctx.selectHomepage(currentHomePage) { selectedApi ->
+                                DataStoreHelper.currentHomePage = selectedApi
+                                currentHomePage = selectedApi
+                                MainActivity.reloadHomeEvent(true)
                             }
                         }
                     ),
@@ -318,7 +308,7 @@ object SettingsUIScreen : SearchableSettings {
                 Text(
                     text = "App Icon",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = AppFont.outfit,
+                        fontFamily = AppFont.plusJakartaSans,
                         fontWeight = FontWeight.Medium,
                         fontSize = 15.sp,
                         color = Color.White,
@@ -330,7 +320,7 @@ object SettingsUIScreen : SearchableSettings {
                 Text(
                     text = "Current: ${activeIcon.label}",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = AppFont.figtree,
+                        fontFamily = AppFont.inter,
                         fontSize = 13.sp,
                         color = Color.White.copy(alpha = 0.65f),
                     ),
@@ -393,7 +383,7 @@ object SettingsUIScreen : SearchableSettings {
                         Text(
                             text = option.label,
                             style = MaterialTheme.typography.labelMedium.copy(
-                                fontFamily = if (isSelected) AppFont.outfit else AppFont.figtree,
+                                fontFamily = if (isSelected) AppFont.plusJakartaSans else AppFont.inter,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                 fontSize = 12.sp,
                             ),

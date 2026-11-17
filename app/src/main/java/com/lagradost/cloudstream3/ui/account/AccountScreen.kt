@@ -1,43 +1,61 @@
 package com.lagradost.cloudstream3.ui.account
 
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,827 +64,1132 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.FocusRequester.Companion.FocusRequesterFactory.component2
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
-import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.R
-import com.lagradost.cloudstream3.mvvm.logError
-import com.lagradost.cloudstream3.utils.DataStoreHelper
+import com.lagradost.cloudstream3.ui.AppIcons
+import com.lagradost.cloudstream3.ui.settings.MergedAppIconPreview
+import com.lagradost.cloudstream3.ui.settings.rememberActiveAppIcon
 import com.lagradost.cloudstream3.utils.DataStoreHelper.Account
-import com.lagradost.cloudstream4.compose.ActionDialog
-import com.lagradost.cloudstream4.compose.BlackButton
-import com.lagradost.cloudstream4.compose.BlackTextField
-import com.lagradost.cloudstream4.compose.EMULATOR
-import com.lagradost.cloudstream4.compose.PHONE
-import com.lagradost.cloudstream4.compose.RoundedShape
-import com.lagradost.cloudstream4.compose.TV
-import com.lagradost.cloudstream4.compose.WhiteButton
-import com.lagradost.cloudstream4.compose.circle
-import com.lagradost.cloudstream4.compose.circleBorder
-import com.lagradost.cloudstream4.compose.focusOutline
-import com.lagradost.cloudstream4.compose.isLayout
-import com.lagradost.cloudstream4.compose.rounded
-import com.lagradost.cloudstream4.compose.whiteOutline
 import com.lagradost.cloudstream4.state.SearchableData
 import com.lagradost.cloudstream4.state.sortByInt
 import com.lagradost.cloudstream4.theme.CloudStreamPreviewTheme
-import com.mihon.material.padding
-import com.mihon.presentation.settings.widget.SwitchPreferenceWidget
-import com.mihon.presentation.settings.widget.TextPreferenceWidget
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.delay
 
 @PreviewLightDark
 @Composable
-fun Preview() {
+private fun WhosWatchingPreview() {
     CloudStreamPreviewTheme {
         AccountScreen.Content(
             state = AccountState(
                 canEditAccount = false,
-                editAccount = Account(
-                    keyIndex = 1,
-                    name = "Hello world",
-                    defaultImageIndex = 2,
-                    lockPin = "1234"
+                canNavigateBack = true,
+                availableAvatars = persistentListOf(
+                    "file:///android_asset/avatars/01_luffy.webp",
+                    "file:///android_asset/avatars/02_nami.webp",
+                    "file:///android_asset/avatars/03_niko_robin.webp",
+                    "file:///android_asset/avatars/04_yamato.webp",
                 ),
                 accounts = SearchableData.from(
-                    data =
-                        (0..7).associateWith { index ->
-                            Account(
-                                keyIndex = index,
-                                name = "hello $index",
-                                defaultImageIndex = index,
-                                lockPin = if (index % 2 == 1) {
-                                    "1234"
-                                } else {
-                                    null
-                                }
-                            )
-                        }.toPersistentMap(),
+                    data = mapOf(
+                        0 to Account(0, "Luffy", defaultImageIndex = 0, avatar = "file:///android_asset/avatars/01_luffy.webp"),
+                        1 to Account(1, "Nami", defaultImageIndex = 1, avatar = "file:///android_asset/avatars/02_nami.webp"),
+                        2 to Account(2, "Robin", defaultImageIndex = 2, avatar = "file:///android_asset/avatars/03_niko_robin.webp", lockPin = "1234"),
+                    ).toPersistentMap(),
                     sortedBy = sortByInt { it.keyIndex },
                 ),
-            ), onAction = {})
+            ),
+            onAction = {},
+            onBack = {},
+        )
     }
 }
 
+private sealed interface AccountScreenDestination {
+    data object Select : AccountScreenDestination
+    data class Edit(val account: Account, val isExisting: Boolean) : AccountScreenDestination
+    data class PinPrompt(val account: Account) : AccountScreenDestination
+}
+
 object AccountScreen {
+
     @Composable
     fun Content(
         state: AccountState,
-        onAction: (AccountAction) -> Unit
+        onAction: (AccountAction) -> Unit,
+        onBack: () -> Unit = {},
     ) {
-        if (state.editAccount != null) {
-            EditAccountDialog(
-                exists = state.accounts.data.containsKey(state.editAccount.keyIndex),
+        val destination: AccountScreenDestination = when {
+            state.editAccount != null -> AccountScreenDestination.Edit(
                 account = state.editAccount,
-                onAction = onAction
+                isExisting = state.accounts.data.containsKey(state.editAccount.keyIndex),
             )
+            state.pendingPinAccount != null -> AccountScreenDestination.PinPrompt(
+                account = state.pendingPinAccount,
+            )
+            else -> AccountScreenDestination.Select
         }
 
-        Scaffold { contentPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding),
-                horizontalAlignment = Alignment.End
-            ) {
-                val (edit, accounts) = remember { FocusRequester.createRefs() }
-
-                IconButton(
-                    onClick = {
-                        onAction(AccountAction.SetEditMode(!state.canEditAccount))
-                    }, modifier = Modifier
-                        .focusRequester(edit)
-                        .focusProperties {
-                            down = accounts
-                        }
-                        .focusOutline(shape = CircleShape)
-                ) {
-                    Icon(
-                        painter = if (state.canEditAccount) {
-                            painterResource(R.drawable.close_24px)
-                        } else {
-                            painterResource(R.drawable.edit_24px)
-                        },
-                        contentDescription = stringResource(R.string.manage_accounts)
-                    )
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = if (state.canEditAccount) stringResource(R.string.manage_accounts) else stringResource(
-                            R.string.select_an_account
-                        ),
-                        style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(MaterialTheme.padding.large)
-                    )
-
-                    AccountsRow(
-                        state = state, onAction = onAction,
-                        modifier = Modifier
-                            .focusRequester(accounts)
-                            .focusProperties {
-                                up = edit
-                            })
-
-                    Spacer(modifier = Modifier.height(100.dp))
-                }
+        BackHandler(enabled = destination !is AccountScreenDestination.Select || state.canNavigateBack) {
+            when (destination) {
+                is AccountScreenDestination.Edit -> onAction(AccountAction.EditAccount(null))
+                is AccountScreenDestination.PinPrompt -> onAction(AccountAction.RequestPinForLogin(null))
+                AccountScreenDestination.Select -> if (state.canNavigateBack) onBack()
             }
         }
-    }
 
-    enum class WaitForDialogType {
-        RemoveLock,
-        NewPassword,
-        DeleteAccount,
-        NewProfileUrl,
-        NewProfilePicture,
-        Login,
-    }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            AnimatedContent(
+                targetState = destination,
+                contentKey = { dest ->
+                    when (dest) {
+                        AccountScreenDestination.Select -> "select"
+                        is AccountScreenDestination.Edit -> "edit_${dest.account.keyIndex}"
+                        is AccountScreenDestination.PinPrompt -> "pin_${dest.account.keyIndex}"
+                    }
+                },
+                transitionSpec = {
+                    val enteringSubScreen =
+                        initialState is AccountScreenDestination.Select &&
+                            targetState !is AccountScreenDestination.Select
+                    val returningToSelect =
+                        initialState !is AccountScreenDestination.Select &&
+                            targetState is AccountScreenDestination.Select
 
-    @Composable
-    fun WaitForDialog(
-        type: WaitForDialogType,
-        onDismissRequest: () -> Unit,
-        account: Account,
-        onAction: (AccountAction) -> Unit
-    ) {
-        when (type) {
-            WaitForDialogType.RemoveLock -> {
-                if (account.lockPin != null) {
-                    EnterPinDialog(
-                        expected = account.lockPin,
-                        onDismissRequest = onDismissRequest,
-                        onCorrect = {
-                            onAction(AccountAction.EditAccount(account.copy(lockPin = null)))
+                    when {
+                        enteringSubScreen -> {
+                            (slideInHorizontally(animationSpec = tween(280)) { it / 3 } +
+                                fadeIn(animationSpec = tween(280))) togetherWith
+                                (slideOutHorizontally(animationSpec = tween(280)) { -it / 4 } +
+                                    fadeOut(animationSpec = tween(220)))
                         }
-                    )
-                }
-            }
-
-            WaitForDialogType.Login -> {
-                if (account.lockPin != null) {
-                    EnterPinDialog(
-                        expected = account.lockPin,
-                        onDismissRequest = onDismissRequest,
-                        onCorrect = {
-                            onAction(AccountAction.SaveAccount(account))
-                            onAction(AccountAction.EditAccount(null))
+                        returningToSelect -> {
+                            (slideInHorizontally(animationSpec = tween(280)) { -it / 3 } +
+                                fadeIn(animationSpec = tween(280))) togetherWith
+                                (slideOutHorizontally(animationSpec = tween(280)) { it / 3 } +
+                                    fadeOut(animationSpec = tween(220)))
                         }
-                    )
-                }
-            }
-
-            WaitForDialogType.NewPassword -> {
-                SetPinDialog(
-                    onDismissRequest = onDismissRequest,
-                    onSet = { newLockPin ->
-                        onAction(AccountAction.EditAccount(account.copy(lockPin = newLockPin)))
-                    })
-            }
-
-            WaitForDialogType.DeleteAccount -> {
-                ActionDialog(
-                    title = stringResource(R.string.delete),
-                    text = stringResource(R.string.delete_message, account.name),
-                    confirm = {
-                        onAction(AccountAction.DeleteAccount(account.keyIndex))
-                        onAction(AccountAction.EditAccount(null))
-                        onDismissRequest()
-                    },
-                    dismiss = onDismissRequest,
-                    confirmText = stringResource(R.string.delete),
-                    dismissText = stringResource(R.string.cancel)
-                )
-            }
-
-            WaitForDialogType.NewProfilePicture -> {
-                SetPictureDialog(
-                    account = account,
-                    onDismissRequest = onDismissRequest,
-                    onSet = { newImage ->
-                        onAction(
-                            AccountAction.EditAccount(
-                                account.copy(
-                                    defaultImageIndex = newImage,
-                                    customImage = null
-                                )
-                            )
+                        else -> fadeIn(tween(220)) togetherWith fadeOut(tween(220))
+                    }
+                },
+                label = "account_screen_transition",
+            ) { currentDest ->
+                when (currentDest) {
+                    AccountScreenDestination.Select -> {
+                        WhosWatchingScreen(
+                            state = state,
+                            onAction = onAction,
+                            onBack = onBack,
                         )
-                        onDismissRequest()
-                    })
-            }
-
-            WaitForDialogType.NewProfileUrl -> {
-                SetUrlDialog(onDismissRequest = onDismissRequest, onSet = { newImage ->
-                    onAction(AccountAction.EditAccount(account.copy(customImage = newImage)))
-                    onDismissRequest()
-                })
+                    }
+                    is AccountScreenDestination.Edit -> {
+                        EditProfileScreen(
+                            account = currentDest.account,
+                            isExisting = currentDest.isExisting,
+                            availableAvatars = state.availableAvatars,
+                            onAction = onAction,
+                        )
+                    }
+                    is AccountScreenDestination.PinPrompt -> {
+                        InlinePinPromptScreen(
+                            account = currentDest.account,
+                            onCancel = { onAction(AccountAction.RequestPinForLogin(null)) },
+                            onVerified = { onAction(AccountAction.LoginWithAccount(currentDest.account.keyIndex)) },
+                        )
+                    }
+                }
             }
         }
     }
 
+    @OptIn(ExperimentalLayoutApi::class)
     @Composable
-    fun EditAccountDialog(
-        exists: Boolean,
-        account: Account,
-        onAction: (AccountAction) -> Unit
-    ) {
-        val selectFileSelector =
-            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                // It lies, it can be null if file manager quits.
-                if (uri == null) return@rememberLauncherForActivityResult
-                val context = CloudStreamApp.context ?: return@rememberLauncherForActivityResult
-
-                try {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                    onAction(AccountAction.EditAccount(account = account.copy(customImage = uri.toString())))
-                } catch (t: Throwable) {
-                    logError(t)
-                }
-            }
-
-        var pendingDialog by remember { mutableStateOf<WaitForDialogType?>(null) }
-        pendingDialog?.let { waitType ->
-            WaitForDialog(
-                type = waitType,
-                onDismissRequest = { pendingDialog = null },
-                account = account,
-                onAction = onAction
-            )
-        }
-
-        val focusRequester = remember { FocusRequester() }
-        LaunchedEffect(Unit) {
-            focusRequester.requestFocus()
-        }
-
-        val isTv = isLayout(TV)
-        AlertDialog(
-            containerColor = MaterialTheme.colorScheme.background,
-            confirmButton = {
-                if (exists) {
-                    WhiteButton(text = stringResource(R.string.delete)) {
-                        pendingDialog = WaitForDialogType.DeleteAccount
-                    }
-                }
-                WhiteButton(text = stringResource(R.string.sort_apply)) {
-                    if (account.lockPin == null) {
-                        onAction(AccountAction.SaveAccount(account))
-                        onAction(AccountAction.EditAccount(null))
-                    } else {
-                        pendingDialog = WaitForDialogType.Login
-                    }
-                }
-            },
-            dismissButton = {
-                BlackButton(
-                    text = stringResource(R.string.cancel),
-                    modifier = Modifier.focusRequester(focusRequester)
-                ) {
-                    onAction(AccountAction.EditAccount(null))
-                }
-            },
-            onDismissRequest = {
-                /**
-                 * For UX reasons we can only dismiss it with the cancel button,
-                 * but does not have those issues
-                 * */
-                if (isTv) {
-                    onAction(AccountAction.EditAccount(null))
-                }
-            },
-            text = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.verticalScroll(rememberScrollState())
-                ) {
-                    AccountImage(
-                        selected = false,
-                        edit = false,
-                        account = account,
-                        onClick = {
-                            onAction(
-                                AccountAction.EditAccount(
-                                    account.copy(
-                                        customImage = null,
-                                        defaultImageIndex = (account.defaultImageIndex + 1) % DataStoreHelper.profileImages.size
-                                    )
-                                )
-                            )
-                        },
-                        onLongClick = {})
-                    Spacer(modifier = Modifier.height(MaterialTheme.padding.medium))
-
-                    BlackTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = account.name,
-                        onValueChange = { newText ->
-                            val newName = if (newText.length <= 100) {
-                                newText
-                            } else {
-                                newText.substring(0, 100)
-                            }
-                            onAction(
-                                AccountAction.EditAccount(
-                                    account.copy(
-                                        name = newName
-                                    )
-                                )
-                            )
-                        },
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            imeAction = ImeAction.Done,
-                            keyboardType = KeyboardType.PersonName,
-                        ),
-                        placeHolder = stringResource(R.string.name)
-                    )
-
-                    var selectProfileImage by remember { mutableStateOf(false) }
-
-
-                    TextPreferenceWidget(
-                        modifier = Modifier
-                            .rounded()
-                            .focusOutline(),
-                        title = stringResource(R.string.edit_profile_image_title),
-                        widget = {
-                            Icon(
-                                painter = painterResource(R.drawable.add_photo_alternate_24px),
-                                contentDescription = null
-                            )
-                            DropdownMenu(expanded = selectProfileImage, onDismissRequest = {
-                                selectProfileImage = false
-                            }, shape = RoundedShape()) {
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.edit_profile_image_url)) },
-                                    onClick = {
-                                        pendingDialog = WaitForDialogType.NewProfileUrl
-                                        selectProfileImage = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.edit_profile_image_picker)) },
-                                    onClick = {
-                                        selectFileSelector.launch(arrayOf("image/*"))
-                                        selectProfileImage = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.edit_profile_image_default)) },
-                                    onClick = {
-                                        pendingDialog = WaitForDialogType.NewProfilePicture
-                                        selectProfileImage = false
-                                    }
-                                )
-                            }
-                        },
-                        onPreferenceClick = {
-                            selectProfileImage = true
-                        }
-                    )
-
-                    if (account.keyIndex != 0) {
-                        SwitchPreferenceWidget(
-                            modifier = Modifier
-                                .rounded()
-                                .focusOutline(),
-                            title = stringResource(R.string.lock_profile),
-                            checked = account.lockPin != null,
-                            onCheckedChanged = {
-                                pendingDialog = if (account.lockPin == null) {
-                                    WaitForDialogType.NewPassword
-                                } else {
-                                    WaitForDialogType.RemoveLock
-                                }
-                            })
-                    }
-
-                }
-            }
-        )
-    }
-
-
-    @Composable
-    fun AccountsRow(
+    private fun WhosWatchingScreen(
         state: AccountState,
         onAction: (AccountAction) -> Unit,
-        modifier: Modifier = Modifier,
+        onBack: () -> Unit,
     ) {
-        FlowRow(
-            modifier = modifier.focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(
-                MaterialTheme.padding.medium,
-                alignment = Alignment.Start
-            ),
-            verticalArrangement = Arrangement.spacedBy(
-                MaterialTheme.padding.medium,
-                alignment = Alignment.CenterVertically
-            ),
+        val context = LocalContext.current
+        val isPreview = LocalInspectionMode.current
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .systemBarsPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            state.accounts.sorted.forEach { key ->
-                val account = state.accounts.data[key]!!
-                Account(
-                    edit = state.canEditAccount,
-                    account = account,
-                    onAction = onAction,
-                    selected = state.lastLoginKeyIndex == account.keyIndex
-                )
+            // Top bar reserving clean vertical rhythm; back button shown when opened from settings/menu
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (state.canNavigateBack) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = AppIcons.ArrowBack,
+                            contentDescription = stringResource(R.string.cancel),
+                            tint = MaterialTheme.colorScheme.onBackground,
+                        )
+                    }
+                }
             }
 
-            var hasFocus by remember { mutableStateOf(false) }
-            val size = 100.dp
-            val innerPadding by animateDpAsState(
-                targetValue = if (hasFocus || isLayout(PHONE or EMULATOR)) 0.dp else MaterialTheme.padding.extraSmall,
-            )
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .width(size)
-                    .onFocusChanged { newFocus ->
-                        hasFocus = newFocus.hasFocus
-                    }
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                val interactionSource = remember { MutableInteractionSource() }
-                Box(
-                    modifier = Modifier
-                        .clickable(interactionSource = interactionSource, indication = null) {
-                            onAction(AccountAction.NewAccount)
-                        }
-                        .size(size)
-                        .padding(innerPadding)
-                        .border(
-                            2.dp,
-                            MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f),
-                            CircleShape
-                        )
-                        .circle()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .whiteOutline(hasFocus = hasFocus, shape = CircleShape)
-                        .indication(
-                            interactionSource = interactionSource,
-                            indication = ripple()
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.add_24px),
-                        contentDescription = stringResource(R.string.add_account),
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(36.dp)
+                // Centered subtle app mark + "Who's Watching?"
+                if (isPreview) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                } else {
+                    val activeIcon = rememberActiveAppIcon()
+                    MergedAppIconPreview(
+                        icon = activeIcon,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .alpha(0.92f),
+                        foregroundInset = 2.dp,
                     )
                 }
-                Spacer(Modifier.height(MaterialTheme.padding.small))
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 Text(
-                    text = stringResource(R.string.add_account),
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = "Who's Watching?",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
                 )
-            }
-        }
-    }
 
-    @Composable
-    fun PinTextField(value: String, onValueChange: (String) -> Unit) {
-        BlackTextField(
-            value = value, keyboardOptions = KeyboardOptions.Default.copy(
-                imeAction = ImeAction.Done,
-                autoCorrectEnabled = false,
-                keyboardType = KeyboardType.NumberPassword,
-            ), placeHolder = stringResource(R.string.pin), onValueChange = onValueChange
-        )
-    }
+                Spacer(modifier = Modifier.height(36.dp))
 
-    @Composable
-    fun EnterPinDialog(expected: String, onDismissRequest: (() -> Unit), onCorrect: (() -> Unit)) {
-        AlertDialog(
-            containerColor = MaterialTheme.colorScheme.background,
-            onDismissRequest = onDismissRequest,
-            confirmButton = {},
-            dismissButton = {
-                BlackButton(text = stringResource(R.string.cancel), onClick = onDismissRequest)
-            },
-            text = {
-                var inputText by remember { mutableStateOf("") }
-                var hasError by remember { mutableStateOf(false) }
-                Column {
-                    PinTextField(
-                        value = inputText,
-                        onValueChange = { newText ->
-                            if (newText.length == expected.length) {
-                                if (newText == expected) {
-                                    onCorrect()
-                                    onDismissRequest()
-                                } else {
-                                    inputText = ""
-                                    hasError = true
-                                }
-                            } else {
-                                inputText = newText
-                            }
-                        },
-                    )
-                    Spacer(modifier = Modifier.height(MaterialTheme.padding.medium))
-                    if (hasError) {
-                        Text(text = stringResource(R.string.pin_error_incorrect))
-                    }
-                }
-            },
-            title = {
-                Text(text = stringResource(R.string.enter_pin))
-            })
-    }
-
-    @Composable
-    fun SetPinDialog(onDismissRequest: (() -> Unit), onSet: ((String) -> Unit)) {
-        var inputText by remember { mutableStateOf("") }
-        AlertDialog(
-            containerColor = MaterialTheme.colorScheme.background,
-            onDismissRequest = onDismissRequest,
-            confirmButton = {
-                if (inputText.length == 4) {
-                    WhiteButton(
-                        text = stringResource(R.string.sort_apply),
-                        onClick = {
-                            onSet(inputText)
-                            onDismissRequest()
-                        })
-                }
-            },
-            dismissButton = {
-                BlackButton(text = stringResource(R.string.cancel), onClick = onDismissRequest)
-            },
-            text = {
-                PinTextField(
-                    value = inputText,
-                    onValueChange = { newText ->
-                        /**
-                         * We require isDigit for SetPin,
-                         * but do not for the EnterPin to avoid inaccessable accounts
-                         * */
-                        val newTextFilter = if (newText.all(Char::isDigit)) {
-                            newText
-                        } else {
-                            newText.filter(Char::isDigit)
-                        }
-
-                        inputText = if (newTextFilter.length <= 4) {
-                            newTextFilter
-                        } else {
-                            newTextFilter.substring(0, 4)
-                        }
-                    },
-                )
-            },
-            title = {
-                Text(text = stringResource(R.string.enter_pin))
-            })
-    }
-
-    @Composable
-    fun SetUrlDialog(onDismissRequest: (() -> Unit), onSet: ((String) -> Unit)) {
-        var inputText by remember { mutableStateOf("") }
-        AlertDialog(
-            containerColor = MaterialTheme.colorScheme.background,
-            onDismissRequest = onDismissRequest,
-            confirmButton = {
-                WhiteButton(
-                    text = stringResource(R.string.sort_apply),
-                    onClick = {
-                        onSet(inputText)
-                        onDismissRequest()
-                    })
-            },
-            dismissButton = {
-                BlackButton(text = stringResource(R.string.cancel), onClick = onDismissRequest)
-            },
-            text = {
-                BlackTextField(
-                    value = inputText,
-                    onValueChange = { newText ->
-                        inputText = newText
-                    },
-                    placeHolder = stringResource(R.string.edit_profile_image_hint)
-                )
-            },
-            title = {
-                Text(text = stringResource(R.string.edit_profile_image_title))
-            })
-    }
-
-    @Composable
-    fun SetPictureDialog(
-        account: Account,
-        onDismissRequest: (() -> Unit),
-        onSet: ((Int) -> Unit)
-    ) {
-        AlertDialog(
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            containerColor = MaterialTheme.colorScheme.background,
-            onDismissRequest = onDismissRequest,
-            confirmButton = { },
-            dismissButton = {
-                BlackButton(text = stringResource(R.string.cancel), onClick = onDismissRequest)
-            },
-            text = {
+                // Centered 2-column grid of circular avatars
                 FlowRow(
-                    modifier = Modifier.focusGroup(),
-                    horizontalArrangement = Arrangement.spacedBy(
-                        MaterialTheme.padding.medium,
-                        alignment = Alignment.Start
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(
-                        MaterialTheme.padding.medium,
-                        alignment = Alignment.CenterVertically
-                    ),
+                    modifier = Modifier.widthIn(max = 320.dp),
+                    maxItemsInEachRow = 2,
+                    horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
-                    for (i in DataStoreHelper.profileImages.indices) {
-                        AccountImage(
-                            edit = false,
-                            showName = false,
-                            selected = account.defaultImageIndex == i,
-                            account = account.copy(
-                                customImage = null,
-                                defaultImageIndex = i,
-                                lockPin = null
-                            ),
+                    state.accounts.sorted.forEach { keyIndex ->
+                        val account = state.accounts.data[keyIndex] ?: return@forEach
+                        val resolvedAvatar = remember(account, state.availableAvatars) {
+                            AvatarCatalog.resolveAvatar(context, account)
+                                ?: state.availableAvatars.firstOrNull()
+                        }
+
+                        ProfileGridItem(
+                            name = account.name,
+                            avatarModel = resolvedAvatar,
+                            isEditMode = state.canEditAccount,
+                            isLocked = account.lockPin != null,
                             onClick = {
-                                onSet(i)
+                                if (state.canEditAccount) {
+                                    onAction(AccountAction.EditAccount(account))
+                                } else if (account.lockPin != null) {
+                                    onAction(AccountAction.RequestPinForLogin(account))
+                                } else {
+                                    onAction(AccountAction.LoginWithAccount(account.keyIndex))
+                                }
                             },
-                            onLongClick = {})
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = state.canEditAccount || state.accounts.data.isEmpty(),
+                        enter = scaleIn(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        ) + fadeIn(),
+                        exit = scaleOut() + fadeOut(),
+                    ) {
+                        AddProfileGridItem(
+                            onClick = { onAction(AccountAction.NewAccount) },
+                        )
                     }
                 }
-            },
-            title = {
-                Text(text = stringResource(R.string.edit_profile_image_title))
-            })
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // Bottom pill-shaped Manage Profiles / Done toggle
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Button(
+                    onClick = { onAction(AccountAction.SetEditMode(!state.canEditAccount)) },
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
+                ) {
+                    AnimatedContent(
+                        targetState = state.canEditAccount,
+                        transitionSpec = {
+                            fadeIn(tween(180)) togetherWith fadeOut(tween(150))
+                        },
+                        label = "manage_toggle_label",
+                    ) { isEditing ->
+                        Text(
+                            text = if (isEditing) "Done" else "Manage Profiles",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     @Composable
-    fun AccountImage(
-        /** If we should show the edit pen */
-        edit: Boolean,
-        /** If this element should have focus */
-        selected: Boolean,
-        /** If we should show the name under the picture */
-        showName: Boolean = true,
-        account: Account,
+    private fun ProfileGridItem(
+        name: String,
+        avatarModel: String?,
+        isEditMode: Boolean,
+        isLocked: Boolean,
         onClick: () -> Unit,
-        onLongClick: () -> Unit
     ) {
-        val image = account.customImage
-            ?: DataStoreHelper.profileImages[account.defaultImageIndex % DataStoreHelper.profileImages.size]
-
         val interactionSource = remember { MutableInteractionSource() }
-        var hasFocus by remember { mutableStateOf(false) }
-        val size = 100.dp
-        val innerPadding by animateDpAsState(
-            targetValue = if (hasFocus || isLayout(PHONE or EMULATOR)) 0.dp else MaterialTheme.padding.extraSmall,
+        val isPressed by interactionSource.collectIsPressedAsState()
+
+        val pressScale by animateFloatAsState(
+            targetValue = if (isPressed) 0.95f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMedium,
+            ),
+            label = "profile_press_scale",
         )
-        val focusRequester = remember { FocusRequester() }
-        LaunchedEffect(Unit) {
-            if (selected) {
-                focusRequester.requestFocus()
-            }
-        }
+        val manageScale by animateFloatAsState(
+            targetValue = if (isEditMode) 0.94f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+            label = "profile_manage_scale",
+        )
+
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .width(size)
-                .focusRequester(focusRequester)
-                .onFocusChanged { newFocus ->
-                    hasFocus = newFocus.hasFocus
-                }
+                .width(116.dp)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
                 modifier = Modifier
-                    .size(size)
-                    .combinedClickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = onClick,
-                        onLongClick = onLongClick
-                    )
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
+                    .size(104.dp)
+                    .graphicsLayer {
+                        val combined = pressScale * manageScale
+                        scaleX = combined
+                        scaleY = combined
+                    },
+                contentAlignment = Alignment.Center,
             ) {
                 AsyncImage(
-                    model = image,
-                    modifier = Modifier
-                        .circleBorder(size)
-                        .whiteOutline(hasFocus = hasFocus, shape = CircleShape)
-                        .indication(interactionSource = interactionSource, indication = ripple()),
-                    contentDescription = account.name,
+                    model = avatarModel,
+                    contentDescription = name,
                     contentScale = ContentScale.Crop,
-                    alpha = if (edit) {
-                        0.6f
-                    } else {
-                        1.0f
-                    }
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                 )
 
-                if (account.lockPin != null) {
+                if (isLocked && !isEditMode) {
                     Box(
-                        contentAlignment = Alignment.TopEnd, modifier = Modifier
-                            .fillMaxSize()
-                            .padding(
-                                MaterialTheme.padding.extraSmall
-                            )
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.video_locked),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier
-                                .size(22.dp + MaterialTheme.padding.extraSmall * 2)
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = CircleShape
-                                )
-                                .padding(MaterialTheme.padding.extraSmall)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
                         )
                     }
                 }
 
                 this@Column.AnimatedVisibility(
-                    visible = edit,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+                    visible = isEditMode,
+                    enter = scaleIn(
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    ) + fadeIn(),
+                    exit = scaleOut() + fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomEnd),
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.edit_24px),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(36.dp),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.edit_24px),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
-            if (showName) {
-                Spacer(Modifier.height(MaterialTheme.padding.small))
-                Text(
-                    text = account.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 
     @Composable
-    fun Account(
-        edit: Boolean,
-        selected: Boolean,
-        account: Account,
-        onAction: (AccountAction) -> Unit
+    private fun AddProfileGridItem(
+        onClick: () -> Unit,
     ) {
-        var waitForLock by remember { mutableStateOf(false) }
-        if (waitForLock && account.lockPin != null) {
-            EnterPinDialog(
-                expected = account.lockPin,
-                onDismissRequest = {
-                    waitForLock = false
-                }, onCorrect = {
-                    onAction(AccountAction.LoginWithAccount(account.keyIndex))
-                })
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val pressScale by animateFloatAsState(
+            targetValue = if (isPressed) 0.95f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMedium,
+            ),
+            label = "add_profile_press_scale",
+        )
+
+        Column(
+            modifier = Modifier
+                .width(116.dp)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(104.dp)
+                    .graphicsLayer {
+                        scaleX = pressScale
+                        scaleY = pressScale
+                    }
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.5.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.add_24px),
+                    contentDescription = "Add Profile",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "Add Profile",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+
+    @Composable
+    private fun EditProfileScreen(
+        account: Account,
+        isExisting: Boolean,
+        availableAvatars: List<String>,
+        onAction: (AccountAction) -> Unit,
+    ) {
+        val context = LocalContext.current
+        val clipboardManager = LocalClipboardManager.current
+        val focusManager = LocalFocusManager.current
+
+        val defaultAvatar = availableAvatars.firstOrNull()
+        val initialResolved = remember(account.keyIndex) {
+            AvatarCatalog.resolveAvatar(context, account) ?: defaultAvatar
+        }
+        val initialPreset = remember(account.keyIndex) {
+            if (initialResolved != null && initialResolved in availableAvatars) {
+                initialResolved
+            } else {
+                defaultAvatar
+            }
+        }
+        val initialCustomUrl = remember(account.keyIndex) {
+            if (initialResolved != null && !AvatarCatalog.isBundledAssetUri(initialResolved)) {
+                initialResolved
+            } else {
+                ""
+            }
         }
 
-        AccountImage(selected = selected, edit = edit, account = account, onClick = {
-            if (edit) {
-                onAction(AccountAction.EditAccount(account))
-            } else if (account.lockPin != null) {
-                waitForLock = true
-            } else {
-                onAction(AccountAction.LoginWithAccount(account.keyIndex))
+        var nameInput by remember(account.keyIndex) { mutableStateOf(account.name) }
+        var customLinkInput by remember(account.keyIndex) { mutableStateOf(initialCustomUrl) }
+        var selectedPresetUri by remember(account.keyIndex) { mutableStateOf(initialPreset) }
+        var showDeleteConfirm by remember(account.keyIndex) { mutableStateOf(false) }
+        var failedCustomUrl by remember(account.keyIndex) { mutableStateOf<String?>(null) }
+
+        val trimmedCustomLink = customLinkInput.trim()
+        val isCustomLinkActive = trimmedCustomLink.isNotEmpty()
+        val isCustomImageError = isCustomLinkActive && failedCustomUrl == trimmedCustomLink
+        val fallbackAvatar = selectedPresetUri ?: defaultAvatar
+        val previewModel = if (isCustomLinkActive && !isCustomImageError) {
+            trimmedCustomLink
+        } else {
+            fallbackAvatar
+        }
+
+        val isDeletable = isExisting && account.keyIndex != 0
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding(),
+        ) {
+            // Top bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { onAction(AccountAction.EditAccount(null)) }) {
+                    Icon(
+                        imageVector = AppIcons.ArrowBack,
+                        contentDescription = stringResource(R.string.cancel),
+                        tint = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Text(
+                    text = if (isExisting) "Edit Profile" else "Create Profile",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                if (isDeletable) {
+                    IconButton(onClick = { showDeleteConfirm = !showDeleteConfirm }) {
+                        Icon(
+                            painter = painterResource(R.drawable.delete_24px),
+                            contentDescription = stringResource(R.string.delete),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
-        }, onLongClick = {
-            /** Long click -> edit without having to press the edit button for better UX */
-            onAction(AccountAction.EditAccount(account))
-        })
+
+            // Inline delete confirmation prompt (zero popups)
+            AnimatedVisibility(
+                visible = isDeletable && showDeleteConfirm,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Delete \"${nameInput.trim().ifEmpty { account.name }}\"?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text(
+                            text = stringResource(R.string.cancel),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            onAction(AccountAction.DeleteAccount(account.keyIndex))
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.delete),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+
+            // Scrollable form content
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Live Hero Avatar Preview (112.dp, 2.5.dp primary ring, 250ms Crossfade)
+                Box(
+                    modifier = Modifier.size(112.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Crossfade(
+                        targetState = previewModel,
+                        animationSpec = tween(durationMillis = 250),
+                        label = "hero_avatar_crossfade",
+                    ) { model ->
+                        AsyncImage(
+                            model = model,
+                            contentDescription = nameInput.ifBlank { "Profile avatar" },
+                            contentScale = ContentScale.Crop,
+                            onSuccess = {
+                                if (model == trimmedCustomLink && isCustomLinkActive) {
+                                    failedCustomUrl = null
+                                }
+                            },
+                            onError = {
+                                if (model == trimmedCustomLink && isCustomLinkActive) {
+                                    failedCustomUrl = trimmedCustomLink
+                                }
+                            },
+                            modifier = Modifier
+                                .size(112.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                        )
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isCustomImageError,
+                        enter = scaleIn() + fadeIn(),
+                        exit = scaleOut() + fadeOut(),
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error)
+                                .border(2.dp, MaterialTheme.colorScheme.background, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.error_24px),
+                                contentDescription = "Invalid image URL",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                // 1. Profile Name flat pill field
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Profile Name",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 12.dp, bottom = 6.dp),
+                    )
+                    FlatPillInputField(
+                        value = nameInput,
+                        onValueChange = { newText ->
+                            nameInput = if (newText.length <= 100) newText else newText.substring(0, 100)
+                        },
+                        placeholder = "Enter profile name",
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction = ImeAction.Next,
+                            keyboardType = KeyboardType.Text,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                        ),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. Custom Image Link flat pill field with Paste / Clear trailing button
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Custom Image Link",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 12.dp, bottom = 6.dp),
+                    )
+                    FlatPillInputField(
+                        value = customLinkInput,
+                        onValueChange = { newText ->
+                            customLinkInput = newText
+                            if (newText.trim() != failedCustomUrl) {
+                                failedCustomUrl = null
+                            }
+                        },
+                        placeholder = "https://...",
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrectEnabled = false,
+                            imeAction = ImeAction.Done,
+                            keyboardType = KeyboardType.Uri,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = { focusManager.clearFocus() },
+                        ),
+                        trailingContent = {
+                            if (customLinkInput.isEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            val clipText = clipboardManager.getText()?.text?.trim()
+                                            if (!clipText.isNullOrEmpty()) {
+                                                customLinkInput = clipText
+                                                failedCustomUrl = null
+                                            }
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.copy_all_24px),
+                                        contentDescription = "Paste",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Text(
+                                        text = "Paste",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            } else {
+                                IconButton(
+                                    onClick = {
+                                        customLinkInput = ""
+                                        failedCustomUrl = null
+                                    },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = AppIcons.Close,
+                                        contentDescription = "Clear link",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
+                        },
+                    )
+
+                    AnimatedVisibility(visible = isCustomImageError) {
+                        Text(
+                            text = "Couldn't load image from this link. Showing fallback avatar.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 12.dp, top = 6.dp),
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Built-In Avatar 4-column Grid (Directly Visible)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Built-in Avatars",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 12.dp, bottom = 12.dp),
+                    )
+
+                    val rows = remember(availableAvatars) { availableAvatars.chunked(4) }
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        rows.forEach { rowAvatars ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            ) {
+                                rowAvatars.forEach { avatarUri ->
+                                    val isSelected = !isCustomLinkActive && selectedPresetUri == avatarUri
+                                    PresetAvatarTile(
+                                        avatarUri = avatarUri,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            selectedPresetUri = avatarUri
+                                            customLinkInput = ""
+                                            failedCustomUrl = null
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                repeat(4 - rowAvatars.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // Pinned Save pill button at bottom with navigationBarsPadding() and imePadding()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+            ) {
+                val canSave = nameInput.isNotBlank()
+                Button(
+                    onClick = {
+                        val finalAvatar = if (isCustomLinkActive && !isCustomImageError) {
+                            trimmedCustomLink
+                        } else {
+                            selectedPresetUri ?: defaultAvatar
+                        }
+                        val isBundled = AvatarCatalog.isBundledAssetUri(finalAvatar)
+                        val bundledIndex = if (finalAvatar != null) {
+                            availableAvatars.indexOf(finalAvatar).coerceAtLeast(0)
+                        } else {
+                            0
+                        }
+
+                        onAction(
+                            AccountAction.SaveAccount(
+                                account.copy(
+                                    name = nameInput.trim(),
+                                    avatar = finalAvatar,
+                                    customImage = if (isBundled) null else finalAvatar,
+                                    defaultImageIndex = if (isBundled) bundledIndex else account.defaultImageIndex,
+                                )
+                            )
+                        )
+                    },
+                    enabled = canSave,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) {
+                    Text(
+                        text = "Save",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun PresetAvatarTile(
+        avatarUri: String,
+        isSelected: Boolean,
+        onClick: () -> Unit,
+        modifier: Modifier = Modifier,
+    ) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        var isBouncing by remember { mutableStateOf(false) }
+
+        LaunchedEffect(isBouncing) {
+            if (isBouncing) {
+                delay(80)
+                isBouncing = false
+            }
+        }
+
+        val scale by animateFloatAsState(
+            targetValue = if (isPressed || isBouncing) 0.90f else 1.0f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium,
+            ),
+            label = "preset_avatar_bounce",
+        )
+
+        Box(
+            modifier = modifier
+                .aspectRatio(1f)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .then(
+                    if (isSelected) {
+                        Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    } else {
+                        Modifier
+                    }
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {
+                        isBouncing = true
+                        onClick()
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = avatarUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+            )
+        }
+    }
+
+    @Composable
+    private fun FlatPillInputField(
+        value: String,
+        onValueChange: (String) -> Unit,
+        placeholder: String,
+        modifier: Modifier = Modifier,
+        keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+        keyboardActions: KeyboardActions = KeyboardActions.Default,
+        visualTransformation: androidx.compose.ui.text.input.VisualTransformation =
+            androidx.compose.ui.text.input.VisualTransformation.None,
+        trailingContent: (@Composable () -> Unit)? = null,
+    ) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(start = 20.dp, end = if (trailingContent != null) 12.dp else 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = keyboardOptions,
+                    keyboardActions = keyboardActions,
+                    visualTransformation = visualTransformation,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            if (trailingContent != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                trailingContent()
+            }
+        }
+    }
+
+    @Composable
+    private fun InlinePinPromptScreen(
+        account: Account,
+        onCancel: () -> Unit,
+        onVerified: () -> Unit,
+    ) {
+        val context = LocalContext.current
+        val expectedPin = account.lockPin.orEmpty()
+        var pinInput by remember(account.keyIndex) { mutableStateOf("") }
+        var hasError by remember(account.keyIndex) { mutableStateOf(false) }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .systemBarsPadding(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        imageVector = AppIcons.ArrowBack,
+                        contentDescription = stringResource(R.string.cancel),
+                        tint = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                AsyncImage(
+                    model = AvatarCatalog.resolveAvatar(context, account),
+                    contentDescription = account.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = stringResource(R.string.enter_pin_with_name, account.name),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                FlatPillInputField(
+                    value = pinInput,
+                    onValueChange = { newText ->
+                        hasError = false
+                        if (newText.length >= expectedPin.length && expectedPin.isNotEmpty()) {
+                            if (newText == expectedPin) {
+                                onVerified()
+                            } else {
+                                pinInput = ""
+                                hasError = true
+                            }
+                        } else {
+                            pinInput = newText
+                        }
+                    },
+                    placeholder = stringResource(R.string.pin),
+                    keyboardOptions = KeyboardOptions(
+                        autoCorrectEnabled = false,
+                        imeAction = ImeAction.Done,
+                        keyboardType = KeyboardType.NumberPassword,
+                    ),
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+
+                AnimatedVisibility(visible = hasError) {
+                    Text(
+                        text = stringResource(R.string.pin_error_incorrect),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
+        }
     }
 }

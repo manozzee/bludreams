@@ -10,33 +10,42 @@ import com.lagradost.cloudstream4.state.DefaultStateContainer
 import com.lagradost.cloudstream4.state.SearchableData
 import com.lagradost.cloudstream4.state.StateContainer
 import com.lagradost.cloudstream4.state.sortByInt
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
-import kotlin.random.Random
-import kotlin.random.nextInt
 
 @Immutable
 data class AccountState(
     /** Mostly used for focus stuff on TV */
-    val lastLoginKeyIndex : Int = 0,
+    val lastLoginKeyIndex: Int = 0,
 
     /** Is currently open to editing */
     val canEditAccount: Boolean = false,
+
+    /** Whether a top-level back button should be shown (when opened from settings/menu) */
+    val canNavigateBack: Boolean = false,
+
+    /** Available bundled avatar URIs from assets/avatars/ */
+    val availableAvatars: ImmutableList<String> = persistentListOf(),
 
     /** keyIndex -> DataStoreHelper.Account sorted by keyIndex as keyIndex is unique and in add order */
     val accounts: SearchableData<Int, DataStoreHelper.Account> = SearchableData.from(
         data = persistentMapOf(),
         /** This will cause bugs if changed! */
-        sortedBy = sortByInt { it.keyIndex }
+        sortedBy = sortByInt { it.keyIndex },
     ),
 
     /**
-     * We are currectly editing this account with this value, it may be an existing/new account
+     * We are currently editing this account with this value, it may be an existing/new account
      * non-null = editing, null = not editing
-     * */
+     */
     val editAccount: DataStoreHelper.Account? = null,
 
+    /** Non-null when prompting inline for a PIN before activating a locked profile */
+    val pendingPinAccount: DataStoreHelper.Account? = null,
+
     /** We are currently logged in with this account, we use state instead of effect to prevent bugs */
-    val loggedInWith: Int? = null
+    val loggedInWith: Int? = null,
 )
 
 @Immutable
@@ -47,17 +56,19 @@ sealed class AccountAction {
     data class SaveAccount(val account: DataStoreHelper.Account) : AccountAction()
     data class LoginWithAccount(val accountKeyIndex: Int) : AccountAction()
     data class DeleteAccount(val accountKeyIndex: Int) : AccountAction()
+    data class RequestPinForLogin(val account: DataStoreHelper.Account?) : AccountAction()
 }
 
 class AccountViewModel2(
     val defaultAccount: DataStoreHelper.Account,
-    initialState : AccountState,
+    initialState: AccountState,
 ) : ViewModel(), StateContainer<AccountState> by DefaultStateContainer(initialState), ActionHandler<AccountAction> {
+
     fun updateAccount(
         updater: (SearchableData<Int, DataStoreHelper.Account>) -> SearchableData<Int, DataStoreHelper.Account>
     ) {
         updateState {
-            /** `adding` has will "Replace" on same key, and "Add" on a new key */
+            /** `adding` will "Replace" on same key, and "Add" on a new key */
             val newAccounts = updater(accounts)
             DataStoreHelper.accounts =
                 Array(newAccounts.sorted.size) { i ->
@@ -78,28 +89,30 @@ class AccountViewModel2(
 
             is AccountAction.NewAccount -> {
                 updateState {
+                    val defaultAvatar = availableAvatars.firstOrNull()
                     copy(
                         editAccount = DataStoreHelper.Account(
                             /** Last => maxOf, this WILL break if we allow other sorting orders */
-                            keyIndex = (accounts.sorted.lastOrNull() ?: 0) + 1,
-                            /** This is not "translated", but that should not really be a problem */
-                            name = "Account ${accounts.data.size + 1}",
+                            keyIndex = (accounts.sorted.maxOrNull() ?: 0) + 1,
+                            name = "",
                             customImage = null,
-                            defaultImageIndex = Random.nextInt(DataStoreHelper.profileImages.indices),
+                            defaultImageIndex = 0,
                             lockPin = null,
+                            avatar = defaultAvatar,
                         )
                     )
                 }
             }
 
             is AccountAction.DeleteAccount -> {
+                if (action.accountKeyIndex == defaultAccount.keyIndex) return
+
                 removeKeys(action.accountKeyIndex.toString())
 
                 /** If we remove the logged in account,
                  * then we switch to the default account */
                 if (action.accountKeyIndex == DataStoreHelper.selectedKeyIndex) {
                     val nextAccount = state.value.accounts.data[defaultAccount.keyIndex]
-                    /** This should never be non-null, but just in case! */
                         ?: defaultAccount
                     DataStoreHelper.setAccount(nextAccount)
                     updateState { copy(lastLoginKeyIndex = nextAccount.keyIndex) }
@@ -115,13 +128,37 @@ class AccountViewModel2(
                         pendingAccounts.adding(defaultAccount.keyIndex, defaultAccount)
                     }
                 }
+                updateState { copy(editAccount = null) }
             }
 
             is AccountAction.SaveAccount -> {
-                updateAccount { accounts ->
-                    /** `adding` has will "Replace" on same key, and "Add" on a new key */
-                    accounts.adding(action.account.keyIndex, action.account)
+                val trimmedName = action.account.name.trim()
+                if (trimmedName.isEmpty()) return
+
+                val avatars = state.value.availableAvatars
+                val rawAvatar = action.account.avatar?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: action.account.customImage?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: avatars.firstOrNull()
+
+                val isBundled = AvatarCatalog.isBundledAssetUri(rawAvatar)
+                val bundledIndex = if (rawAvatar != null) {
+                    avatars.indexOf(rawAvatar).coerceAtLeast(0)
+                } else {
+                    0
                 }
+
+                val normalizedAccount = action.account.copy(
+                    name = trimmedName,
+                    avatar = rawAvatar,
+                    customImage = if (isBundled) null else rawAvatar,
+                    defaultImageIndex = if (isBundled) bundledIndex else action.account.defaultImageIndex,
+                )
+
+                updateAccount { accounts ->
+                    /** `adding` will "Replace" on same key, and "Add" on a new key */
+                    accounts.adding(normalizedAccount.keyIndex, normalizedAccount)
+                }
+                updateState { copy(editAccount = null) }
             }
 
             is AccountAction.LoginWithAccount -> {
@@ -130,11 +167,21 @@ class AccountViewModel2(
                 // Show toast if we have many accounts, as it is unnecessary for 1 account
                 DataStoreHelper.setAccount(loginAccount, showToast = accounts.data.size > 1)
                 MainActivity.reloadAccountEvent(true)
-                updateState { copy(loggedInWith = loginAccount.keyIndex, lastLoginKeyIndex = loginAccount.keyIndex) }
+                updateState {
+                    copy(
+                        pendingPinAccount = null,
+                        loggedInWith = loginAccount.keyIndex,
+                        lastLoginKeyIndex = loginAccount.keyIndex,
+                    )
+                }
             }
 
             is AccountAction.EditAccount -> {
                 updateState { copy(editAccount = action.account) }
+            }
+
+            is AccountAction.RequestPinForLogin -> {
+                updateState { copy(pendingPinAccount = action.account) }
             }
         }
     }

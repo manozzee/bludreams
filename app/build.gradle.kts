@@ -4,6 +4,7 @@ import org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -85,25 +86,61 @@ android {
     }
 
     signingConfigs {
-        // We just use SIGNING_KEY_ALIAS here since it won't change
-        // so won't kill the configuration cache.
-        val keyAliasEnv = System.getenv("SIGNING_KEY_ALIAS")
-        if (!keyAliasEnv.isNullOrBlank()) {
-            val keystorePathEnv = System.getenv("SIGNING_KEYSTORE_PATH")
-            val releaseStoreFile: File? = if (!keystorePathEnv.isNullOrBlank()) {
-                File(keystorePathEnv).takeIf { it.isFile }
+        val keystorePropsFile = rootProject.layout.projectDirectory.file("keystore.properties").asFile
+        val keystoreProps = Properties().apply {
+            if (keystorePropsFile.isFile) {
+                keystorePropsFile.inputStream().use { load(it) }
+            }
+        }
+
+        val keyAliasValue = providers.environmentVariable("SIGNING_KEY_ALIAS").orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: keystoreProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
+        val keystorePathValue = providers.environmentVariable("SIGNING_KEYSTORE_PATH").orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: keystoreProps.getProperty("storeFile")?.takeIf { it.isNotBlank() }
+        val storePasswordValue = providers.environmentVariable("SIGNING_STORE_PASSWORD").orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: keystoreProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
+        val keyPasswordValue = providers.environmentVariable("SIGNING_KEY_PASSWORD").orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: keystoreProps.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
+            ?: storePasswordValue
+
+        val hasAnyReleaseConfig = listOfNotNull(
+            keyAliasValue,
+            keystorePathValue,
+            storePasswordValue,
+        ).isNotEmpty()
+
+        if (hasAnyReleaseConfig) {
+            val releaseStoreFile: File? = if (keystorePathValue != null) {
+                val candidate = File(keystorePathValue)
+                val resolved = if (candidate.isAbsolute) candidate else rootProject.file(keystorePathValue)
+                if (!resolved.isFile) {
+                    throw GradleException(
+                        "Release signing keystore file not found at '${resolved.absolutePath}'."
+                    )
+                }
+                resolved
             } else {
                 val tmpFilePath = System.getProperty("user.home") + "/work/_temp/keystore/"
-                File(tmpFilePath).listFiles()?.firstOrNull()
+                File(tmpFilePath).listFiles()?.firstOrNull { it.isFile }
             }
 
-            if (releaseStoreFile != null && releaseStoreFile.exists()) {
-                create("release") {
-                    storeFile = releaseStoreFile
-                    storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                    keyAlias = keyAliasEnv
-                    keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-                }
+            if (releaseStoreFile == null || keyAliasValue == null || storePasswordValue == null || keyPasswordValue == null) {
+                throw GradleException(
+                    "Incomplete release signing configuration. Provide SIGNING_KEYSTORE_PATH, " +
+                        "SIGNING_KEY_ALIAS, SIGNING_STORE_PASSWORD, and SIGNING_KEY_PASSWORD " +
+                        "(or all fields in keystore.properties)."
+                )
+            }
+
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
             }
         }
     }
@@ -155,11 +192,7 @@ android {
             isDebuggable = false
             isMinifyEnabled = false
             isShrinkResources = false
-            if (signingConfigs.names.contains("release")) {
-                signingConfig = signingConfigs.getByName("release")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

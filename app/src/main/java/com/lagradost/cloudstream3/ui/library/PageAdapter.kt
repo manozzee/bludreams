@@ -18,7 +18,6 @@ import com.lagradost.cloudstream3.ui.home.ComposeViewBinding
 import com.lagradost.cloudstream3.ui.home.PosterCardFromSearchResponse
 import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
-import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_SHOW_METADATA
 import com.lagradost.cloudstream3.ui.search.SearchClickCallback
 
 class PageAdapter(
@@ -78,16 +77,6 @@ class PageAdapter(
                                     )
                                 )
                             },
-                            onLongClick = {
-                                clickCallback(
-                                    SearchClickCallback(
-                                        action = SEARCH_ACTION_SHOW_METADATA,
-                                        view = holder.itemView,
-                                        position = position,
-                                        card = item
-                                    )
-                                )
-                            }
                         )
                     }
                 }

@@ -38,7 +38,7 @@ fun TextPreferenceWidget(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                        fontFamily = com.lagradost.cloudstream4.theme.AppFont.inter,
                     ),
                     color = Color.White.copy(alpha = 0.65f),
                     fontSize = 13.sp,

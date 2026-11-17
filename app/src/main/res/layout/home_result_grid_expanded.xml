@@ -196,7 +196,7 @@
             android:paddingBottom="5dp"
             android:textColor="?attr/textColor"
             android:textSize="13sp"
-            android:fontFamily="@font/outfit_semibold"
+            android:fontFamily="@font/plus_jakarta_sans_semibold"
             tools:text="The Perfect Run\nThe Perfect Run\nhello" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

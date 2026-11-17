@@ -283,6 +283,7 @@ class PlayerGestureHelper(private val playerView: PlayerView) {
     /** Speed-up */
 
     fun showOrHideSpeedUp(show: Boolean) {
+        if (playerView.callbacks?.usesComposeHud() == true) return
         playerView.playerSpeedupButton?.let { btn ->
             btn.clearAnimation()
             btn.alpha = if (show) 0f else 1f
@@ -390,6 +391,8 @@ class PlayerGestureHelper(private val playerView: PlayerView) {
         }
 
         currentRequestedVolume = next
+        playerView.callbacks?.onVolumeChanged(next, hasBoostError)
+        if (playerView.callbacks?.usesComposeHud() == true) return
 
         val leftHolder = playerView.playerProgressbarLeftHolder ?: return
         val level1 = playerView.playerProgressbarLeftLevel1  ?: return
@@ -505,6 +508,8 @@ class PlayerGestureHelper(private val playerView: PlayerView) {
         currentExtraBrightness = if (extraBrightnessEnabled && next > 1.0f) min(2.0f, next) - 1.0f else 0.0f
         brightnessOverlay?.alpha = currentExtraBrightness
         playerView.callbacks?.onBrightnessExtra(currentExtraBrightness)
+        playerView.callbacks?.onBrightnessChanged(next)
+        if (playerView.callbacks?.usesComposeHud() == true) return
 
         val rightHolder = playerView.playerProgressbarRightHolder ?: return
         val level1 = playerView.playerProgressbarRightLevel1 ?: return
@@ -869,6 +874,7 @@ class PlayerGestureHelper(private val playerView: PlayerView) {
      * the same fade logic.
      */
     fun animateCenterControls(fadeTo: Float) {
+        if (playerView.callbacks?.usesComposeHud() == true) return
         val from = if (fadeTo > 0.5f) 0f else 1f
         fun makeAnim() = AlphaAnimation(from, fadeTo).apply { duration = 100; fillAfter = true }
         // Each view needs its own Animation instance; sharing one causes fillAfter to
@@ -881,6 +887,11 @@ class PlayerGestureHelper(private val playerView: PlayerView) {
     /** Plays the rewind animation and seeks back by [fastForwardTime]. */
     fun rewind() {
         try {
+            if (playerView.callbacks?.usesComposeHud() == true) {
+                playerView.player.seekTime(-fastForwardTime)
+                playerView.callbacks?.onDoubleTapSeek(false, fastForwardTime)
+                return
+            }
             val rewHolder = playerView.playerRewHolder ?: return
             val rew = playerView.playerRew
             val rewText = playerView.exoRewText
@@ -921,6 +932,11 @@ class PlayerGestureHelper(private val playerView: PlayerView) {
     /** Plays the fast-forward animation and seeks forward by [fastForwardTime]. */
     fun fastForward() {
         try {
+            if (playerView.callbacks?.usesComposeHud() == true) {
+                playerView.player.seekTime(fastForwardTime)
+                playerView.callbacks?.onDoubleTapSeek(true, fastForwardTime)
+                return
+            }
             val ffwdHolder = playerView.playerFfwdHolder ?: return
             val ffwd = playerView.playerFfwd
             val ffwdText = playerView.exoFfwdText

@@ -4,7 +4,6 @@ package com.lagradost.cloudstream3.ui.player
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.DialogInterface
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Handler
@@ -15,7 +14,6 @@ import android.widget.FrameLayout
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.OptIn
-import androidx.appcompat.app.AlertDialog
 import androidx.core.net.toUri
 import androidx.media3.common.C.TIME_UNSET
 import androidx.media3.common.C.TRACK_TYPE_AUDIO
@@ -207,6 +205,8 @@ class CS3IPlayer : IPlayer {
 
     override fun getDuration(): Long? = exoPlayer?.duration
     override fun getPosition(): Long? = exoPlayer?.currentPosition
+    override fun getBufferedPosition(): Long? = exoPlayer?.bufferedPosition
+    override fun isAtLiveEdge(): Boolean = LiveHelper.getLiveManager(exoPlayer)?.isAtLiveEdge() == true
     override fun getIsPlaying(): Boolean = isPlaying
     override fun getPlaybackSpeed(): Float = playBackSpeed
 
@@ -1897,35 +1897,21 @@ class CS3IPlayer : IPlayer {
                         return
                     }
 
-                    val builder: AlertDialog.Builder = AlertDialog.Builder(context)
-
-                    val dialogClickListener =
-                        DialogInterface.OnClickListener { _, which ->
-                            when (which) {
-                                DialogInterface.BUTTON_POSITIVE -> {
+                    event(
+                        TorrentConfirmationEvent(
+                            onDecision = { accepted ->
+                                if (accepted) {
                                     Torrent.hasAcceptedTorrentForThisSession = true
                                     loadTorrent(context, link)
-                                }
-
-                                DialogInterface.BUTTON_NEGATIVE -> {
+                                } else {
                                     Torrent.hasAcceptedTorrentForThisSession = false
                                     val errorMessage =
                                         context.getString(R.string.torrent_not_accepted)
                                     event(ErrorEvent(ErrorLoadingException(errorMessage)))
                                 }
-                            }
-                        }
-
-                    builder.setTitle(R.string.play_torrent_button)
-                        .setMessage(R.string.torrent_info)
-                        // Ensure that the user will not accidentally start a torrent session.
-                        .setCancelable(false).setOnCancelListener {
-                            val errorMessage = context.getString(R.string.torrent_not_accepted)
-                            event(ErrorEvent(ErrorLoadingException(errorMessage)))
-                        }
-                        .setPositiveButton(R.string.ok, dialogClickListener)
-                        .setNegativeButton(R.string.go_back, dialogClickListener)
-                        .show().setDefaultFocus()
+                            },
+                        ),
+                    )
 
                     return
                 }

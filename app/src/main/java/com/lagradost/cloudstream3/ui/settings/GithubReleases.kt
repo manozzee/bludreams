@@ -21,7 +21,7 @@ object GithubReleases : GithubRepository {
     @Serializable
     private data class GithubRelease(
         @JsonProperty("tag_name") @SerialName("tag_name") val tagName: String, // Version code
-        @JsonProperty("body") @SerialName("body") val body: String, // Description
+        @JsonProperty("body") @SerialName("body") val body: String? = null, // Description
         @JsonProperty("assets") @SerialName("assets") val assets: List<GithubAsset>,
         @JsonProperty("target_commitish") @SerialName("target_commitish") val targetCommitish: String, // Branch
         @JsonProperty("prerelease") @SerialName("prerelease") val prerelease: Boolean,
@@ -64,7 +64,7 @@ object GithubReleases : GithubRepository {
             digest = foundAsset.digest,
             downloadUrl = foundAsset.browserDownloadUrl,
             displayName = foundAsset.name.substringBeforeLast("."),
-            changeLog = latestRelease.body,
+            changeLog = latestRelease.body.orEmpty(),
             tagName = latestRelease.tagName,
             nodeId = latestRelease.nodeId
         )

@@ -112,10 +112,16 @@ object AccountHelper {
         binding.accountImage.loadImage(account.image)
         binding.accountImageHolder.setOnClickListener {
             // Roll the image forwards once
-            currentEditAccount = currentEditAccount.copy(customImage = null)
-            currentEditAccount =
-                currentEditAccount.copy(defaultImageIndex = (currentEditAccount.defaultImageIndex + 1) % DataStoreHelper.profileImages.size)
-            binding.accountImage.loadImage(currentEditAccount.image)
+            val avatars = AvatarCatalog.getAvatars(context)
+            if (avatars.isNotEmpty()) {
+                val nextIndex = (currentEditAccount.defaultImageIndex + 1) % avatars.size
+                currentEditAccount = currentEditAccount.copy(
+                    customImage = null,
+                    defaultImageIndex = nextIndex,
+                    avatar = avatars[nextIndex],
+                )
+                binding.accountImage.loadImage(currentEditAccount.image)
+            }
         }
 
         // Handle applying changes

@@ -1,5 +1,9 @@
 package com.lagradost.cloudstream3.ui.details
 
+import android.graphics.Bitmap
+import android.os.Build
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,14 +13,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -33,15 +40,33 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.transformations
+import coil3.size.Size as CoilSize
+import coil3.transform.Transformation
 import com.lagradost.cloudstream3.ActorData
 import com.lagradost.cloudstream3.DubStatus
 import com.lagradost.cloudstream3.R
@@ -49,15 +74,18 @@ import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.mvvm.Resource
 import com.lagradost.cloudstream3.ui.WatchType
 import com.lagradost.cloudstream3.ui.home.rememberHeroStretchState
+import com.lagradost.cloudstream3.ui.liquidglass.extractPosterGradientColor
 import com.lagradost.cloudstream3.ui.result.EpisodeRange
 import com.lagradost.cloudstream3.ui.result.ExtractedTrailerData
 import com.lagradost.cloudstream3.ui.result.ResultData
 import com.lagradost.cloudstream3.ui.result.ResultEpisode
 import com.lagradost.cloudstream3.ui.result.ResumeWatchingStatus
-import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.UiText
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.util.Random
 
 @Composable
 fun DetailsScreen(
@@ -110,7 +138,7 @@ fun DetailsScreen(
     onEpisodeToggleWatched: (ResultEpisode) -> Unit,
     onActorClick: (ActorData) -> Unit,
     onRecommendationClick: (SearchResponse) -> Unit,
-    onRecommendationLongClick: (SearchResponse) -> Unit,
+    onRecommendationLongClick: ((SearchResponse) -> Unit)? = null,
     onTrailerClick: (TrailerMirror) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -127,6 +155,7 @@ fun DetailsScreen(
     val heroStretch = rememberHeroStretchState()
     val density = LocalDensity.current
     val heroHeightPx = with(density) { DetailHeroBaseHeight.toPx() }
+    val heroLogoThresholdPx = with(density) { (DetailHeroBaseHeight - 102.dp).toPx() }
 
     val scrollOffsetPx by remember(listState, heroHeightPx) {
         derivedStateOf {
@@ -136,9 +165,9 @@ fun DetailsScreen(
             }
         }
     }
-    val collapseProgress by remember(scrollOffsetPx, heroHeightPx) {
+    val isScrolledPastHeroLogo by remember(listState, scrollOffsetPx, heroLogoThresholdPx) {
         derivedStateOf {
-            (scrollOffsetPx / (heroHeightPx * 0.72f)).coerceIn(0f, 1f)
+            listState.firstVisibleItemIndex > 0 || scrollOffsetPx >= heroLogoThresholdPx
         }
     }
     val isHeroVisible by remember(listState, scrollOffsetPx, heroHeightPx) {
@@ -170,7 +199,8 @@ fun DetailsScreen(
     var isTrailerReady by remember(trailerMirrors, activeTrailerIndex) { mutableStateOf(false) }
     var isTrailerMuted by rememberSaveable { mutableStateOf(true) }
     var hasTrailerFinishedOrFailedAll by remember(trailerMirrors) { mutableStateOf(false) }
-    var episodeLayoutStyle by rememberSaveable { mutableStateOf(EpisodeLayoutStyle.HORIZONTAL) }
+    var episodeLayoutStyle by rememberSaveable { mutableStateOf(EpisodeLayoutStyle.LIST) }
+    var selectedInfoTab by rememberSaveable(currentContentId) { mutableStateOf(DetailInfoTab.DETAILS) }
 
     val currentBackgroundTrailer = trailerMirrors.getOrNull(activeTrailerIndex)
 
@@ -194,12 +224,124 @@ fun DetailsScreen(
         isTrailerAutoPlaying = true
     }
 
+    val posterSourceUrl = resultData?.posterImage?.takeIf { it.isNotBlank() }
+    var extractedPosterColor by remember(posterSourceUrl) { mutableStateOf<Color?>(null) }
+    LaunchedEffect(posterSourceUrl) {
+        extractedPosterColor = if (posterSourceUrl == null) {
+            null
+        } else {
+            extractPosterGradientColor(context, posterSourceUrl)
+        }
+    }
+
+    var filmGrainBitmap by remember { mutableStateOf(cachedFilmGrainBitmap) }
+    LaunchedEffect(Unit) {
+        if (filmGrainBitmap == null) {
+            val generated = withContext(Dispatchers.Default) {
+                generateFilmGrainNoiseBitmap()
+            }
+            cachedFilmGrainBitmap = generated
+            filmGrainBitmap = generated
+        }
+    }
+    val filmGrainBrush = remember(filmGrainBitmap) {
+        filmGrainBitmap?.let { bitmap ->
+            ShaderBrush(
+                ImageShader(
+                    image = bitmap,
+                    tileModeX = TileMode.Repeated,
+                    tileModeY = TileMode.Repeated,
+                ),
+            )
+        }
+    }
+
+    val fallbackAccent = MaterialTheme.colorScheme.primary
+    val targetPalette = remember(extractedPosterColor, fallbackAccent) {
+        computePosterDuotonePalette(extractedPosterColor, fallbackAccent)
+    }
+    val topTint by animateColorAsState(
+        targetValue = targetPalette.topTint,
+        animationSpec = tween(durationMillis = 480),
+        label = "detailsTopTint",
+    )
+    val bottomTint by animateColorAsState(
+        targetValue = targetPalette.bottomTint,
+        animationSpec = tween(durationMillis = 480),
+        label = "detailsBottomTint",
+    )
+
+    val blurredPosterModel = remember(posterSourceUrl, context) {
+        posterSourceUrl?.let { url ->
+            ImageRequest.Builder(context)
+                .data(url)
+                .apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        size(240)
+                    } else {
+                        size(120)
+                        transformations(StaticPosterBlurTransformation())
+                    }
+                }
+                .build()
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(bottomTint)
             .nestedScroll(heroStretch.nestedScrollConnection),
     ) {
+        if (blurredPosterModel != null) {
+            AsyncImage(
+                model = blurredPosterModel,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .let { baseModifier ->
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            baseModifier.blur(
+                                radius = 90.dp,
+                                edgeTreatment = BlurredEdgeTreatment.Rectangle,
+                            )
+                        } else {
+                            baseModifier
+                        }
+                    },
+            )
+        }
+
+        // Poster-Tinted Atmospheric Scrim
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                topTint.copy(alpha = 0.72f),
+                                bottomTint.copy(alpha = 0.84f),
+                            ),
+                        ),
+                    )
+                },
+        )
+
+        // Subtle OLED Film-Grain Overlay (3% opacity)
+        if (filmGrainBrush != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        drawRect(
+                            brush = filmGrainBrush,
+                            alpha = 0.03f,
+                        )
+                    },
+            )
+        }
         when (pageResource) {
             is Resource.Loading, null -> {
                 Box(
@@ -281,7 +423,6 @@ fun DetailsScreen(
                 val vpnStr = data.vpnText?.asStringNull(context)
                 val metaStr = data.metaText?.asStringNull(context)
                 val plotStr = data.plotText.asStringNull(context)?.html()?.toString()
-                val actorsStr = data.actorsText?.asStringNull(context)
                 val noEpisodesStr = data.noEpisodesFoundText?.asStringNull(context)
                 val episodesCountStr = episodesCountText?.asStringNull(context)
 
@@ -299,35 +440,13 @@ fun DetailsScreen(
                             } else {
                                 val s = resumeWatching.result.season
                                 val e = resumeWatching.result.episode
-                                val epBadge = if (s != null && s > 0) "S$s:E$e" else "E$e"
+                                val epBadge = if (s != null && s > 0) "S$s E$e" else "E$e"
                                 "$resumeString $epBadge"
                             }
                         }
                         !moviePlayText.isNullOrBlank() -> moviePlayText
                         else -> playEpisodeString
                     }
-                }
-                val resumeSubLabel = remember(resumeWatching, context) {
-                    if (resumeWatching != null && !resumeWatching.isMovie) {
-                        context.getNameFull(
-                            resumeWatching.result.name,
-                            resumeWatching.result.episode,
-                            resumeWatching.result.season,
-                        )
-                    } else {
-                        null
-                    }
-                }
-                val resumeProgressFraction = remember(resumeWatching) {
-                    val prog = resumeWatching?.progress
-                    if (prog != null && prog.maxProgress > 0) {
-                        (prog.progress.toFloat() / prog.maxProgress.toFloat()).coerceIn(0f, 1f)
-                    } else {
-                        null
-                    }
-                }
-                val resumeTimeLeftLabel = remember(resumeWatching, context) {
-                    resumeWatching?.progress?.progressLeft?.asStringNull(context)
                 }
 
                 val mappedSeasonOptions = remember(seasonSelections, context) {
@@ -367,7 +486,9 @@ fun DetailsScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 112.dp),
+                    contentPadding = PaddingValues(
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     // 1. HERO SECTION (with Background Trailer Surface)
@@ -409,32 +530,11 @@ fun DetailsScreen(
                         )
                     }
 
-                    // 2. METADATA CHIPS & TAGS
-                    item(key = "detail_meta_info") {
-                        DetailMetaInfo(
-                            yearText = yearStr,
-                            durationText = durationStr,
-                            contentRatingText = contentRatingStr,
-                            ratingText = ratingStr,
-                            statusText = statusStr,
-                            typeText = typeStr,
-                            apiNameText = apiNameStr,
-                            nextAiringEpisodeText = nextAiringEpStr,
-                            nextAiringDateText = nextAiringDateStr,
-                            vpnText = vpnStr,
-                            metaText = metaStr,
-                            tags = data.tags,
-                        )
-                    }
-
-                    // 3. ACTION BUTTONS
+                    // 2. ACTION BUTTONS
                     if (!data.comingSoon) {
                         item(key = "detail_action_buttons") {
                             DetailActionButtons(
                                 primaryPlayLabel = primaryPlayLabel,
-                                resumeSubLabel = resumeSubLabel,
-                                resumeProgressFraction = resumeProgressFraction,
-                                resumeTimeLeftLabel = resumeTimeLeftLabel,
                                 watchType = watchStatus,
                                 isFavorite = isFavorite,
                                 isSubscribed = isSubscribed,
@@ -493,7 +593,7 @@ fun DetailsScreen(
                         }
                     }
 
-                    // 4. EXPANDABLE SYNOPSIS
+                    // 3. EXPANDABLE SYNOPSIS
                     if (!plotStr.isNullOrBlank()) {
                         item(key = "detail_synopsis") {
                             ExpandableDescription(
@@ -502,15 +602,31 @@ fun DetailsScreen(
                         }
                     }
 
-                    // 5. CAST & CREW CAROUSEL (Required to be before Episodes)
+                    // 4. DETAILS / CAST & CREW TAB SWITCHER
                     val actorsList = data.actors.orEmpty()
-                    if (showCastSetting && actorsList.isNotEmpty()) {
-                        item(key = "detail_cast_section") {
-                            DetailCastSection(
-                                actors = actorsList,
-                                onActorClick = onActorClick,
-                            )
-                        }
+                    item(key = "detail_info_tabs") {
+                        DetailInfoTabsSection(
+                            selectedTab = selectedInfoTab,
+                            onSelectTab = { selectedInfoTab = it },
+                            typeText = typeStr,
+                            yearText = yearStr,
+                            durationText = durationStr,
+                            statusText = statusStr,
+                            contentRatingText = contentRatingStr,
+                            ratingText = ratingStr,
+                            apiNameText = apiNameStr,
+                            nextAiringEpisodeText = nextAiringEpStr,
+                            nextAiringDateText = nextAiringDateStr,
+                            vpnText = vpnStr,
+                            metaText = metaStr,
+                            tags = data.tags,
+                            trailers = trailerMirrors,
+                            fallbackBackdropUrl = fallbackBackdrop,
+                            onTrailerClick = onTrailerClick,
+                            actors = actorsList,
+                            showCastSetting = showCastSetting,
+                            onActorClick = onActorClick,
+                        )
                     }
 
                     // 6. SEASONS & EPISODES (Series / Anime - Virtualized)
@@ -599,25 +715,38 @@ fun DetailsScreen(
                                     }
                                 } else {
                                     // Flattened items in parent LazyColumn for smooth virtualization
-                                    items(
+                                    itemsIndexed(
                                         items = episodesList,
-                                        key = { ep -> "ep_list_${ep.id}_${ep.episode}_${ep.index}" },
-                                    ) { episode ->
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp),
+                                        key = { _, ep -> "ep_list_${ep.id}_${ep.episode}_${ep.index}" },
+                                    ) { index, episode ->
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
                                         ) {
-                                            EpisodeListCard(
-                                                episode = episode,
-                                                fallbackBackdropUrl = fallbackBackdrop,
-                                                hasDownloadSupport = hasDownloadSupport,
-                                                onClick = { onEpisodeClick(episode) },
-                                                onLongClick = { onEpisodeLongClick(episode) },
-                                                onDownloadClick = { onEpisodeDownloadClick(episode) },
-                                                onDownloadLongClick = { onEpisodeDownloadLongClick(episode) },
-                                                onToggleWatched = { onEpisodeToggleWatched(episode) },
-                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 20.dp),
+                                            ) {
+                                                EpisodeListCard(
+                                                    episode = episode,
+                                                    fallbackBackdropUrl = fallbackBackdrop,
+                                                    hasDownloadSupport = hasDownloadSupport,
+                                                    onClick = { onEpisodeClick(episode) },
+                                                    onLongClick = { onEpisodeLongClick(episode) },
+                                                    onDownloadClick = { onEpisodeDownloadClick(episode) },
+                                                    onDownloadLongClick = { onEpisodeDownloadLongClick(episode) },
+                                                    onToggleWatched = { onEpisodeToggleWatched(episode) },
+                                                )
+                                            }
+                                            if (index < episodesList.lastIndex) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(top = 14.dp)
+                                                        .height(1.dp)
+                                                        .background(Color.White.copy(alpha = 0.08f)),
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -627,32 +756,7 @@ fun DetailsScreen(
                         }
                     }
 
-                    // 7. TRAILERS & EXTRAS SECTION
-                    if (trailerMirrors.isNotEmpty()) {
-                        item(key = "detail_trailers_section") {
-                            DetailTrailersSection(
-                                trailers = trailerMirrors,
-                                fallbackBackdropUrl = fallbackBackdrop,
-                                onTrailerClick = onTrailerClick,
-                            )
-                        }
-                    }
-
-                    // 8. SHOW DETAILS TABLE
-                    item(key = "detail_additional_info_section") {
-                        DetailAdditionalInfoSection(
-                            typeText = typeStr,
-                            yearText = yearStr,
-                            durationText = durationStr,
-                            statusText = statusStr,
-                            contentRatingText = contentRatingStr,
-                            ratingText = ratingStr,
-                            apiNameText = apiNameStr,
-                            actorsText = actorsStr,
-                        )
-                    }
-
-                    // 9. MORE LIKE THIS (RECOMMENDATIONS) - at the absolute bottom
+                    // 6. MORE LIKE THIS (RECOMMENDATIONS) - at the absolute bottom
                     if (recommendations.isNotEmpty()) {
                         item(key = "detail_recommendations_section") {
                             DetailPosterRailSection(
@@ -672,7 +776,7 @@ fun DetailsScreen(
         }.orEmpty()
         DetailFloatingHeader(
             title = headerTitle,
-            collapseProgress = collapseProgress,
+            isScrolledPastHeroLogo = isScrolledPastHeroLogo,
             showTrailerMuteButton = currentBackgroundTrailer != null && isTrailerAutoPlaying && isTrailerReady,
             isTrailerMuted = isTrailerMuted,
             showSyncButton = showSyncButton,
@@ -682,7 +786,135 @@ fun DetailsScreen(
             onShareClick = {
                 resultData?.let(onShareClick)
             },
+            logoUrl = resultData?.logoUrl,
+            stickyBackgroundColor = topTint,
             modifier = Modifier.align(Alignment.TopCenter),
         )
+    }
+}
+
+private data class DetailsDuotonePalette(
+    val topTint: Color,
+    val bottomTint: Color,
+)
+
+private fun computePosterDuotonePalette(
+    extracted: Color?,
+    fallbackAccent: Color,
+): DetailsDuotonePalette {
+    val sourceColor = extracted ?: fallbackAccent
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(sourceColor.toArgb(), hsv)
+    var hue = hsv[0]
+    val saturation = if (hsv[1] >= 0.08f) {
+        if (hue in 48f..75f) {
+            hue = 36f + (hue - 48f) * 0.25f
+        }
+        hsv[1].coerceIn(0.50f, 0.70f)
+    } else {
+        hsv[1]
+    }
+    return DetailsDuotonePalette(
+        topTint = Color.hsv(hue = hue, saturation = saturation, value = 0.24f),
+        bottomTint = Color.hsv(hue = hue, saturation = saturation, value = 0.12f),
+    )
+}
+
+@Volatile
+private var cachedFilmGrainBitmap: ImageBitmap? = null
+
+private fun generateFilmGrainNoiseBitmap(): ImageBitmap {
+    val size = 128
+    val pixels = IntArray(size * size)
+    val random = Random(0x5EED128L)
+    for (i in pixels.indices) {
+        val luma = random.nextInt(256)
+        val alpha = 120 + random.nextInt(136)
+        pixels[i] = (alpha shl 24) or (luma shl 16) or (luma shl 8) or luma
+    }
+    return createBitmap(size, size).apply {
+        setPixels(pixels, 0, size, 0, 0, size, size)
+    }.asImageBitmap()
+}
+
+private const val POSTER_BLUR_TARGET_WIDTH = 96
+
+private class StaticPosterBlurTransformation(
+    private val radius: Int = 14,
+) : Transformation() {
+    override val cacheKey: String = "static_poster_blur_$radius"
+
+    override suspend fun transform(input: Bitmap, size: CoilSize): Bitmap =
+        withContext(Dispatchers.Default) {
+            val targetH = ((input.height.toFloat() / input.width.coerceAtLeast(1)) * POSTER_BLUR_TARGET_WIDTH)
+                .toInt()
+                .coerceIn(72, 160)
+            val scaled = input.scale(POSTER_BLUR_TARGET_WIDTH, targetH)
+            val pixelCount = POSTER_BLUR_TARGET_WIDTH * targetH
+            val pixels = IntArray(pixelCount)
+            scaled.getPixels(pixels, 0, POSTER_BLUR_TARGET_WIDTH, 0, 0, POSTER_BLUR_TARGET_WIDTH, targetH)
+            if (scaled !== input) {
+                scaled.recycle()
+            }
+
+            val temp = IntArray(pixelCount)
+            repeat(2) {
+                boxBlurPass(src = pixels, dst = temp, height = targetH, radius = radius, horizontal = true)
+                boxBlurPass(src = temp, dst = pixels, height = targetH, radius = radius, horizontal = false)
+            }
+
+            createBitmap(POSTER_BLUR_TARGET_WIDTH, targetH).apply {
+                setPixels(pixels, 0, POSTER_BLUR_TARGET_WIDTH, 0, 0, POSTER_BLUR_TARGET_WIDTH, targetH)
+            }
+        }
+}
+
+private fun boxBlurPass(
+    src: IntArray,
+    dst: IntArray,
+    height: Int,
+    radius: Int,
+    horizontal: Boolean,
+) {
+    val windowSize = radius * 2 + 1
+    if (horizontal) {
+        for (y in 0 until height) {
+            val rowOffset = y * POSTER_BLUR_TARGET_WIDTH
+            for (x in 0 until POSTER_BLUR_TARGET_WIDTH) {
+                var rSum = 0
+                var gSum = 0
+                var bSum = 0
+                for (dx in -radius..radius) {
+                    val sx = (x + dx).coerceIn(0, POSTER_BLUR_TARGET_WIDTH - 1)
+                    val c = src[rowOffset + sx]
+                    rSum += (c shr 16) and 0xFF
+                    gSum += (c shr 8) and 0xFF
+                    bSum += c and 0xFF
+                }
+                dst[rowOffset + x] = (0xFF shl 24) or
+                    ((rSum / windowSize) shl 16) or
+                    ((gSum / windowSize) shl 8) or
+                    (bSum / windowSize)
+            }
+        }
+    } else {
+        for (y in 0 until height) {
+            for (x in 0 until POSTER_BLUR_TARGET_WIDTH) {
+                var rSum = 0
+                var gSum = 0
+                var bSum = 0
+                for (dy in -radius..radius) {
+                    val sy = (y + dy).coerceIn(0, height - 1)
+                    val c = src[sy * POSTER_BLUR_TARGET_WIDTH + x]
+                    rSum += (c shr 16) and 0xFF
+                    gSum += (c shr 8) and 0xFF
+                    bSum += c and 0xFF
+                }
+                dst[y * POSTER_BLUR_TARGET_WIDTH + x] = (0xFF shl 24) or
+                    ((rSum / windowSize) shl 16) or
+                    ((gSum / windowSize) shl 8) or
+                    (bSum / windowSize)
+            }
+        }
     }
 }

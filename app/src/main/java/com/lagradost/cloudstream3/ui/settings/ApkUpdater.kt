@@ -1,28 +1,35 @@
 package com.lagradost.cloudstream3.ui.settings
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
-import com.lagradost.cloudstream3.BuildConfig
+import androidx.core.net.toUri
+import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.CommonActivity
 import com.lagradost.cloudstream3.ErrorLoadingException
-import com.lagradost.cloudstream3.MainActivity.Companion.deleteFileOnExit
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.receivers.PackageInstallerStatusReceiver
 import com.lagradost.cloudstream4.AppSettings
+import com.lagradost.cloudstream4.viewmodels.ApkInstallEvent
+import com.lagradost.cloudstream4.viewmodels.ApkInstallStatus
 import com.lagradost.cloudstream4.viewmodels.AppUpdater
 import com.lagradost.cloudstream4.viewmodels.DigestPair
+import com.lagradost.cloudstream4.viewmodels.DownloadedUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.DigestException
@@ -32,100 +39,226 @@ object ApkUpdater : AppUpdater {
     private const val APP_UPDATE_NAME = "BluDreams"
     private const val APP_UPDATE_SUFFIX = "apk"
 
+    private val _installEvents = MutableSharedFlow<ApkInstallEvent>(extraBufferCapacity = 8)
+    override val installEvents: Flow<ApkInstallEvent> = _installEvents.asSharedFlow()
+
+    private fun resolveContext(): Context {
+        return CommonActivity.activity
+            ?: CloudStreamApp.context
+            ?: throw ErrorLoadingException("No activity or application context found")
+    }
+
     @Throws
-    override suspend fun update(
-        settings: AppSettings,
+    override suspend fun downloadUpdate(
         url: String,
         digest: DigestPair?,
-        downloadProgress: (Long, Long?) -> Unit
-    ) {
-        val activity = CommonActivity.activity ?: throw ErrorLoadingException("No activity found")
-        clearOldFiles(activity)
+        downloadProgress: (Long, Long?) -> Unit,
+    ): DownloadedUpdate = withContext(Dispatchers.IO) {
+        val context = resolveContext()
+        clearDownloadedUpdates()
 
-        val request = app.get(url)
-        val length = request.size
-        val body = request.body
-        body.use { body ->
-            val length = length ?: body.contentLength()
-            val readStream = body.byteStream()
+        val cacheDir = context.cacheDir
+        if (!cacheDir.exists()) {
+            cacheDir.mkdirs()
+        }
+        val downloadedFile = File.createTempFile(
+            "$APP_UPDATE_NAME-",
+            ".$APP_UPDATE_SUFFIX",
+            cacheDir,
+        )
 
-            when (settings.updates.apkInstaller.get()) {
-                0 -> {
-                    packageInstallerDownloader(
-                        activity,
-                        readStream,
-                        length,
-                        digest,
-                        downloadProgress
+        try {
+            val request = app.get(url)
+            val requestSize = request.size
+            request.body.use { body ->
+                val length = requestSize ?: body.contentLength().takeIf { it > 0L }
+                val readStream = body.byteStream()
+                downloadedFile.outputStream().use { writeStream ->
+                    transfer(
+                        writeStream = writeStream,
+                        readStream = readStream,
+                        length = length,
+                        downloadProgress = downloadProgress,
+                        digest = digest,
                     )
                 }
-
-                else -> {
-                    legacyDownloader(activity, readStream, length, digest, downloadProgress)
-                }
             }
+            val finalSize = downloadedFile.length()
+            if (finalSize <= 0L) {
+                throw IllegalStateException("Downloaded APK file is empty")
+            }
+            DownloadedUpdate(
+                apkPath = downloadedFile.absolutePath,
+                totalBytes = finalSize,
+            )
+        } catch (t: Throwable) {
+            safe { downloadedFile.delete() }
+            throw t
         }
     }
 
-    fun clearOldFiles(activity: Activity) {
-        // Delete old files
-        activity.cacheDir.listFiles()?.filter {
+    override suspend fun installUpdate(
+        settings: AppSettings,
+        apkPath: String,
+    ): ApkInstallStatus {
+        val context = CommonActivity.activity ?: resolveContext()
+        val apkFile = File(apkPath)
+        if (!apkFile.exists() || apkFile.length() <= 0L) {
+            return ApkInstallStatus.Failed(
+                FileNotFoundException("Downloaded APK file could not be found"),
+            )
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !context.packageManager.canRequestPackageInstalls()
+        ) {
+            return withContext(Dispatchers.Main) {
+                try {
+                    val settingsIntent = Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        "package:${context.packageName}".toUri(),
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(settingsIntent)
+                    ApkInstallStatus.PermissionRequired
+                } catch (t: Throwable) {
+                    ApkInstallStatus.Failed(t)
+                }
+            }
+        }
+
+        return when (settings.updates.apkInstaller.get()) {
+            0 -> installWithPackageInstaller(context, apkFile)
+            else -> installWithLegacyIntent(context, apkFile)
+        }
+    }
+
+    override fun clearDownloadedUpdates() {
+        val context = CommonActivity.activity ?: CloudStreamApp.context ?: return
+        context.cacheDir.listFiles()?.filter {
             it.name.startsWith(APP_UPDATE_NAME) && it.extension == APP_UPDATE_SUFFIX
-        }?.forEach {
-            deleteFileOnExit(it)
+        }?.forEach { file ->
+            safe { file.delete() }
+        }
+    }
+
+    internal fun onPackageInstallerStatus(
+        status: Int,
+        message: String?,
+        throwable: Throwable? = null,
+    ) {
+        when (status) {
+            PackageInstaller.STATUS_SUCCESS -> {
+                _installEvents.tryEmit(ApkInstallEvent.Success)
+            }
+
+            PackageInstaller.STATUS_FAILURE_ABORTED -> {
+                _installEvents.tryEmit(ApkInstallEvent.Cancelled)
+            }
+
+            else -> {
+                val detail = buildString {
+                    append("PackageInstaller failed (status=")
+                    append(status)
+                    append(')')
+                    if (!message.isNullOrBlank()) {
+                        append(": ")
+                        append(message)
+                    }
+                }
+                _installEvents.tryEmit(
+                    ApkInstallEvent.Failed(throwable ?: IllegalStateException(detail)),
+                )
+            }
         }
     }
 
     /** https://medium.com/@solrudev/painless-building-of-an-android-package-installer-app-d5a09b5df432 */
     @SuppressLint("RequestInstallPackagesPolicy")
-    @Throws
-    suspend fun packageInstallerDownloader(
-        activity: Activity,
-        readStream: InputStream,
-        length: Long?,
-        digest: DigestPair?,
-        downloadProgress: (Long, Long?) -> Unit,
-    ) = withContext(Dispatchers.IO) {
+    private suspend fun installWithPackageInstaller(
+        context: Context,
+        apkFile: File,
+    ): ApkInstallStatus = withContext(Dispatchers.IO) {
         var sessionId: Int? = null
-        val packageInstaller = activity.packageManager.packageInstaller
+        val packageInstaller = context.packageManager.packageInstaller
         try {
+            val apkSize = apkFile.length()
             val installParams =
                 PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                installParams.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-            }
-            if (length != null) {
-                installParams.setSize(length)
-            }
+                    .apply {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            setRequireUserAction(
+                                PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED,
+                            )
+                        }
+                        if (apkSize > 0L) {
+                            setSize(apkSize)
+                        }
+                    }
 
             sessionId = packageInstaller.createSession(installParams)
-            val session = packageInstaller.openSession(sessionId)
-
-            // We do not need to buffer this because transfer has large writes
-            session.openWrite(activity.packageName, 0, length ?: -1L)
-                .use { writeStream ->
-                    transfer(writeStream, readStream, length, downloadProgress, digest)
+            packageInstaller.openSession(sessionId).use { session ->
+                session.openWrite(
+                    "${context.packageName}.apk",
+                    0,
+                    if (apkSize > 0L) apkSize else -1L,
+                ).use { writeStream ->
+                    apkFile.inputStream().use { inputStream ->
+                        inputStream.copyTo(writeStream, DEFAULT_BUFFER_SIZE)
+                    }
                     session.fsync(writeStream)
                 }
 
-            val receiverIntent = Intent(activity, PackageInstallerStatusReceiver::class.java)
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-            val receiverPendingIntent =
-                PendingIntent.getBroadcast(activity, 0, receiverIntent, flags)
+                val receiverIntent = Intent(
+                    context,
+                    PackageInstallerStatusReceiver::class.java,
+                ).apply {
+                    action = PackageInstallerStatusReceiver.ACTION_INSTALL_STATUS
+                }
+                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+                val receiverPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    sessionId,
+                    receiverIntent,
+                    flags,
+                )
 
-            // Avoid delayed updates, and just commit instantly
-            session.commit(receiverPendingIntent.intentSender)
-            session.close()
-        } catch (t: Throwable) {
-            sessionId?.let { sessionId ->
-                packageInstaller.abandonSession(sessionId)
+                session.commit(receiverPendingIntent.intentSender)
             }
-            throw t
+            ApkInstallStatus.Launched
+        } catch (t: Throwable) {
+            sessionId?.let { id ->
+                safe { packageInstaller.abandonSession(id) }
+            }
+            ApkInstallStatus.Failed(t)
+        }
+    }
+
+    private suspend fun installWithLegacyIntent(
+        context: Context,
+        apkFile: File,
+    ): ApkInstallStatus = withContext(Dispatchers.Main) {
+        try {
+            val contentUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                apkFile,
+            )
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            }
+            context.startActivity(installIntent)
+            ApkInstallStatus.Launched
+        } catch (t: Throwable) {
+            ApkInstallStatus.Failed(t)
         }
     }
 
@@ -240,35 +373,4 @@ object ApkUpdater : AppUpdater {
             }
             return@withContext safe { md.digest() }
         }
-
-    @Throws
-    suspend fun legacyDownloader(
-        activity: Activity,
-        readStream: InputStream,
-        length: Long?,
-        digest: DigestPair?,
-        downloadProgress: (Long, Long?) -> Unit
-    ) = withContext(Dispatchers.IO) {
-        val downloadedFile = File.createTempFile(APP_UPDATE_NAME, ".$APP_UPDATE_SUFFIX")
-
-        // We do not need to buffer this because transfer has large writes
-        downloadedFile.outputStream().use { writeStream ->
-            transfer(writeStream, readStream, length, downloadProgress, digest)
-        }
-
-        openApk(activity, downloadedFile)
-    }
-
-    fun openApk(context: Context, file: File) {
-        val contentUri = FileProvider.getUriForFile(
-            context, BuildConfig.APPLICATION_ID + ".provider", file
-        )
-        val installIntent = Intent(Intent.ACTION_VIEW).apply {
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-            data = contentUri
-        }
-        context.startActivity(installIntent)
-    }
 }

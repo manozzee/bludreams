@@ -115,7 +115,7 @@
                 android:gravity="end"
                 android:singleLine="true"
                 android:textAppearance="?android:attr/textAppearanceListItem"
-                android:fontFamily="@font/figtree_medium"
+                android:fontFamily="@font/inter_medium"
                 android:fontFeatureSettings="tnum"
                 android:ellipsize="marquee"
                 android:fadingEdge="horizontal"

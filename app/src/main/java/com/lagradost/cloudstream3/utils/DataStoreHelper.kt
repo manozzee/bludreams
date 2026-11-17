@@ -25,6 +25,7 @@ import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.syncproviders.AccountManager
 import com.lagradost.cloudstream3.syncproviders.SyncAPI
 import com.lagradost.cloudstream3.ui.WatchType
+import com.lagradost.cloudstream3.ui.account.AvatarCatalog
 import com.lagradost.cloudstream3.ui.library.ListSorting
 import com.lagradost.cloudstream3.ui.player.ExtractorUri
 import com.lagradost.cloudstream3.ui.player.NEXT_WATCH_EPISODE_PERCENTAGE
@@ -85,16 +86,6 @@ class UserPreferenceDelegate<T : Any>(
 }
 
 object DataStoreHelper {
-    // be aware, don't change the index of these as Account uses the index for the art
-    val profileImages = arrayOf(
-        R.drawable.profile_bg_dark_blue,
-        R.drawable.profile_bg_blue,
-        R.drawable.profile_bg_orange,
-        R.drawable.profile_bg_pink,
-        R.drawable.profile_bg_purple,
-        R.drawable.profile_bg_red,
-        R.drawable.profile_bg_teal,
-    )
 
     private var searchPreferenceProvidersStrings: List<String> by UserPreferenceDelegate(
         /** java moment right here, as listOf()::class.java != List(0) { "" }::class.java */
@@ -169,14 +160,17 @@ object DataStoreHelper {
         @JsonProperty("keyIndex") @SerialName("keyIndex") val keyIndex: Int,
         @JsonProperty("name") @SerialName("name") val name: String,
         @JsonProperty("customImage") @SerialName("customImage") val customImage: String? = null,
-        @JsonProperty("defaultImageIndex") @SerialName("defaultImageIndex") val defaultImageIndex: Int,
+        @JsonProperty("defaultImageIndex") @SerialName("defaultImageIndex") val defaultImageIndex: Int = 0,
         @JsonProperty("lockPin") @SerialName("lockPin") val lockPin: String? = null,
+        @JsonProperty("avatar") @SerialName("avatar") val avatar: String? = null,
     ) {
         @get:JsonIgnore
-        val image get() = customImage?.let { UiImage.Image(it) } ?:
-            profileImages.getOrNull(defaultImageIndex)?.let {
-                UiImage.Drawable(it)
-            } ?: UiImage.Drawable(profileImages.first())
+        val resolvedAvatarUri: String?
+            get() = AvatarCatalog.resolveAvatar(context, this)
+
+        @get:JsonIgnore
+        val image: UiImage?
+            get() = resolvedAvatarUri?.let { UiImage.Image(it) }
     }
 
     const val TAG = "data_store_helper"
@@ -226,6 +220,7 @@ object DataStoreHelper {
                 keyIndex = 0,
                 name = context.getString(R.string.default_account),
                 defaultImageIndex = 0,
+                avatar = AvatarCatalog.defaultAvatar(context),
             )
         }
     }

@@ -899,18 +899,8 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                             }
                         }
 
-                        val error = listOf(
-                            R.drawable.profile_bg_dark_blue,
-                            R.drawable.profile_bg_blue,
-                            R.drawable.profile_bg_orange,
-                            R.drawable.profile_bg_pink,
-                            R.drawable.profile_bg_purple,
-                            R.drawable.profile_bg_red,
-                            R.drawable.profile_bg_teal
-                        ).random()
-
                         backgroundPoster.loadImage(d.posterBackgroundImage, headers = d.posterHeaders) {
-                            error { getImageFromDrawable(context ?: return@error null, error) }
+                            error { getImageFromDrawable(context ?: return@error null, R.drawable.bg_color_both) }
                         }
 
                         bindLogo(

@@ -155,6 +155,12 @@ data class DownloadEvent(
     override val source: PlayerEventSource = PlayerEventSource.Player
 ) : PlayerEvent()
 
+/** Event emitted when a torrent stream requires user confirmation for this session */
+data class TorrentConfirmationEvent(
+    val onDecision: (Boolean) -> Unit,
+    override val source: PlayerEventSource = PlayerEventSource.Player,
+) : PlayerEvent()
+
 interface Track {
     /**
      * Unique among the class, used to check which track is used.
@@ -215,6 +221,10 @@ interface IPlayer {
     fun getDuration(): Long?
     /** Current player position in milliseconds */
     fun getPosition(): Long?
+    /** Current buffered position in milliseconds */
+    fun getBufferedPosition(): Long? = null
+    /** Whether playback is currently at the live edge of a dynamic stream */
+    fun isAtLiveEdge(): Boolean = false
 
     fun seekTime(time: Long, source: PlayerEventSource = PlayerEventSource.UI)
     fun seekTo(time: Long, source: PlayerEventSource = PlayerEventSource.UI)

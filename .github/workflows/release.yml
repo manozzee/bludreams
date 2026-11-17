@@ -70,24 +70,41 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Prepare signing keystore (optional)
+      - name: Prepare release signing keystore
         id: keystore
         env:
           KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEY_ALIAS" ]; then
-            mkdir -p "${RUNNER_TEMP}/keystore"
-            KEYSTORE_FILE="${RUNNER_TEMP}/keystore/release.jks"
-            echo "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_FILE"
-            echo "keystore_path=${KEYSTORE_FILE}" >> "$GITHUB_OUTPUT"
-            echo "signed=true" >> "$GITHUB_OUTPUT"
-            echo "Using release keystore from repository secrets."
-          else
-            echo "keystore_path=" >> "$GITHUB_OUTPUT"
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "No release keystore secrets configured; falling back to debug signing."
+          MISSING_SECRETS=()
+          [ -z "$KEYSTORE_B64" ] && MISSING_SECRETS+=("SIGNING_KEYSTORE_BASE64")
+          [ -z "$SIGNING_KEY_ALIAS" ] && MISSING_SECRETS+=("SIGNING_KEY_ALIAS")
+          [ -z "$SIGNING_STORE_PASSWORD" ] && MISSING_SECRETS+=("SIGNING_STORE_PASSWORD")
+          [ -z "$SIGNING_KEY_PASSWORD" ] && MISSING_SECRETS+=("SIGNING_KEY_PASSWORD")
+
+          if [ "${#MISSING_SECRETS[@]}" -gt 0 ]; then
+            echo "::error::Missing required release signing secret(s): ${MISSING_SECRETS[*]}. Configure them under Repository Settings -> Secrets and variables -> Actions."
+            exit 1
           fi
+
+          mkdir -p "${RUNNER_TEMP}/keystore"
+          KEYSTORE_FILE="${RUNNER_TEMP}/keystore/release.jks"
+          printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE_FILE"
+
+          if [ ! -s "$KEYSTORE_FILE" ]; then
+            echo "::error::Decoded release keystore file is empty. Verify SIGNING_KEYSTORE_BASE64."
+            exit 1
+          fi
+
+          if ! keytool -list -keystore "$KEYSTORE_FILE" -storepass:env SIGNING_STORE_PASSWORD -alias "$SIGNING_KEY_ALIAS" >/dev/null; then
+            echo "::error::Failed to verify keystore with SIGNING_KEY_ALIAS and SIGNING_STORE_PASSWORD."
+            exit 1
+          fi
+
+          echo "keystore_path=${KEYSTORE_FILE}" >> "$GITHUB_OUTPUT"
+          echo "Verified release keystore and alias '${SIGNING_KEY_ALIAS}'."
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
@@ -104,17 +121,37 @@ jobs:
           MAL_KEY: ${{ secrets.MAL_KEY }}
           ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
 
-      - name: Prepare signed release APK
+      - name: Clean up temporary keystore
+        if: always()
+        run: rm -rf "${RUNNER_TEMP}/keystore"
+
+      - name: Prepare & verify signed release APK
         run: |
-          BUILT_APK=$(find app/build/outputs/apk/stable/release -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          BUILT_APK=$(find app/build/outputs/apk/stable/release -maxdepth 1 -type f -name '*.apk' ! -name '*-unsigned.apk' | head -n 1)
           if [ -z "$BUILT_APK" ]; then
-            echo "::error::No release APK found in app/build/outputs/apk/stable/release"
+            echo "::error::No signed release APK found in app/build/outputs/apk/stable/release"
             exit 1
           fi
           TARGET_APK="app/build/outputs/apk/stable/release/BluDreams-${{ steps.meta.outputs.tag_name }}.apk"
           if [ "$BUILT_APK" != "$TARGET_APK" ]; then
             mv "$BUILT_APK" "$TARGET_APK"
           fi
+
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER=$(find "$SDK_ROOT/build-tools" -maxdepth 2 -type f -name 'apksigner' 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::Could not locate apksigner in $SDK_ROOT/build-tools"
+            exit 1
+          fi
+
+          VERIFY_OUTPUT=$("$APKSIGNER" verify --verbose --print-certs "$TARGET_APK")
+          echo "$VERIFY_OUTPUT"
+
+          if echo "$VERIFY_OUTPUT" | grep -q "CN=Android Debug, O=Android, C=US"; then
+            echo "::error::Release APK was signed with the Android Debug certificate instead of the release keystore!"
+            exit 1
+          fi
+
           ls -lh app/build/outputs/apk/stable/release/*.apk
 
       - name: Publish GitHub Release
@@ -123,6 +160,7 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag_name }}
           target_commitish: ${{ github.sha }}
           name: ${{ steps.meta.outputs.release_title }}
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
           make_latest: true

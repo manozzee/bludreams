@@ -161,7 +161,7 @@ fun AppBarTitle(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.plusJakartaSans,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     fontSize = 20.sp,
                     color = Color.White,
@@ -172,7 +172,7 @@ fun AppBarTitle(
             Text(
                 text = it,
                 style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                    fontFamily = com.lagradost.cloudstream4.theme.AppFont.inter,
                 ),
                 color = Color.White.copy(alpha = 0.65f),
                 maxLines = 1,

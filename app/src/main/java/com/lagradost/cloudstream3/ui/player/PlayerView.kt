@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
@@ -29,6 +30,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.MainThread
 import androidx.annotation.OptIn
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
@@ -63,6 +65,7 @@ import com.lagradost.cloudstream3.ui.subtitles.SaveCaptionStyle
 import com.lagradost.cloudstream3.ui.subtitles.SubtitlesFragment
 import com.lagradost.cloudstream3.utils.AppContextUtils
 import com.lagradost.cloudstream3.utils.AppContextUtils.requestLocalAudioFocus
+import com.lagradost.cloudstream3.utils.AppContextUtils.setDefaultFocus
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.UIHelper.hideKeyboard
 import com.lagradost.cloudstream3.utils.UIHelper.hideSystemUI
@@ -160,6 +163,17 @@ class PlayerView @JvmOverloads constructor(
          * Implement to hide the player controls.
          */
         fun onAutoHideUI() {}
+
+        /** Whether the host renders its phone HUD with Jetpack Compose instead of legacy XML views. */
+        fun usesComposeHud(): Boolean = false
+        /** Requests user confirmation before starting a torrent session; returns true if handled. */
+        fun onTorrentConfirmationRequest(onDecision: (Boolean) -> Unit): Boolean = false
+        /** Called when a double-tap seek triggers backward or forward. */
+        fun onDoubleTapSeek(isForward: Boolean, deltaMs: Long) {}
+        /** Called whenever volume level changes (0f..2f). */
+        fun onVolumeChanged(volume: Float, hasBoostError: Boolean) {}
+        /** Called whenever brightness level changes (0f..2f). */
+        fun onBrightnessChanged(brightness: Float) {}
     }
 
     var callbacks: Callbacks? = null
@@ -429,16 +443,21 @@ class PlayerView @JvmOverloads constructor(
 
     var fullscreenNotch: Boolean = true // TODO SETTING
 
-    fun enterFullscreen(updateOrientation: () -> Unit = {}) {
-        val activity = context as? Activity
-        if (isFullScreen) {
-            activity?.hideSystemUI()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && fullscreenNotch) {
-                val params = activity?.window?.attributes
-                params?.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                activity?.window?.attributes = params
+    fun applyFullscreenCutoutMode() {
+        val activity = context as? Activity ?: return
+        if (!isFullScreen) return
+        activity.hideSystemUI()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && fullscreenNotch) {
+            val params = activity.window?.attributes
+            if (params != null && params.layoutInDisplayCutoutMode != LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES) {
+                params.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                activity.window?.attributes = params
             }
         }
+    }
+
+    fun enterFullscreen(updateOrientation: () -> Unit = {}) {
+        applyFullscreenCutoutMode()
         updateOrientation()
     }
 
@@ -576,6 +595,16 @@ class PlayerView @JvmOverloads constructor(
         }
 
         keepScreenOn(isPlayingRightNow || isBuffering)
+
+        if (callbacks?.usesComposeHud() == true) {
+            PlayerPipHelper.updatePIPModeActions(
+                context as? Activity,
+                isPlaying,
+                hasPipModeSupport,
+                player.getAspectRatio()
+            )
+            return
+        }
 
         if (isBuffering) {
             playerPausePlayHolderHolder?.isVisible = false
@@ -815,6 +844,28 @@ class PlayerView @JvmOverloads constructor(
                         ?.getBoolean(ctx.getString(R.string.autoplay_next_key), true) == true
                 ) {
                     player.handleEvent(CSPlayerEvent.NextEpisode, source = PlayerEventSource.Player)
+                }
+            }
+            is TorrentConfirmationEvent -> {
+                if (callbacks?.onTorrentConfirmationRequest(event.onDecision) != true) {
+                    val dialogClickListener =
+                        DialogInterface.OnClickListener { _, which ->
+                            when (which) {
+                                DialogInterface.BUTTON_POSITIVE -> event.onDecision(true)
+                                DialogInterface.BUTTON_NEGATIVE -> event.onDecision(false)
+                            }
+                        }
+                    AlertDialog.Builder(context)
+                        .setTitle(R.string.play_torrent_button)
+                        .setMessage(R.string.torrent_info)
+                        .setCancelable(false)
+                        .setOnCancelListener {
+                            event.onDecision(false)
+                        }
+                        .setPositiveButton(R.string.ok, dialogClickListener)
+                        .setNegativeButton(R.string.go_back, dialogClickListener)
+                        .show()
+                        .setDefaultFocus()
                 }
             }
             is PauseEvent -> Unit

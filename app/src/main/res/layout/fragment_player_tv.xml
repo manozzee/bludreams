@@ -7,8 +7,7 @@
     android:layout_height="match_parent"
     android:background="@android:color/black"
     android:orientation="horizontal"
-    app:backgroundTint="@android:color/black"
-    app:surface_type="texture_view">
+    app:backgroundTint="@android:color/black">
     <!--
           app:fastforward_increment="10000"
             app:rewind_increment="10000"-->
@@ -24,7 +23,8 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:show_timeout="0" />
+        app:show_timeout="0"
+        app:surface_type="texture_view" />
 
     <FrameLayout
         android:id="@+id/player_loading_overlay"
@@ -91,6 +91,12 @@
                 android:nextFocusRight="@id/overlay_loading_skip_button"
                 android:nextFocusDown="@id/overlay_loading_skip_button" />
         </FrameLayout>
+
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/player_loading_compose"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
     </FrameLayout>
 
     <!--<FrameLayout

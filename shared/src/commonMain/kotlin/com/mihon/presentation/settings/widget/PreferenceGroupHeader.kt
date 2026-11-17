@@ -29,7 +29,7 @@ fun PreferenceGroupHeader(
             text = title,
             color = Color.White,
             style = MaterialTheme.typography.titleSmall.copy(
-                fontFamily = AppFont.outfit,
+                fontFamily = AppFont.plusJakartaSans,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
                 letterSpacing = 0.3.sp,

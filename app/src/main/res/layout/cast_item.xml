@@ -43,7 +43,7 @@
                     android:contentDescription="@string/episode_poster_img_des"
                     android:foreground="@drawable/outline_big_35_gray"
                     android:scaleType="centerCrop"
-                    tools:src="@drawable/profile_bg_blue" />
+                    tools:src="@drawable/default_cover" />
             </androidx.cardview.widget.CardView>
 
             <androidx.cardview.widget.CardView

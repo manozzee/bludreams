@@ -326,7 +326,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 }
 
             context?.let { ctx ->
-                androidx.core.content.res.ResourcesCompat.getFont(ctx, com.lagradost.cloudstream3.R.font.outfit_semibold)?.let { tf ->
+                androidx.core.content.res.ResourcesCompat.getFont(ctx, com.lagradost.cloudstream3.R.font.plus_jakarta_sans_semibold)?.let { tf ->
                     searchTitle.typeface = tf
                 }
             }

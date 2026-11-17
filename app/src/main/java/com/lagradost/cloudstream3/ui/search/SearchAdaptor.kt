@@ -107,16 +107,6 @@ class SearchAdapter(
                                     )
                                 )
                             },
-                            onLongClick = {
-                                clickCallback(
-                                    SearchClickCallback(
-                                        action = SEARCH_ACTION_SHOW_METADATA,
-                                        view = holder.itemView,
-                                        position = position,
-                                        card = item
-                                    )
-                                )
-                            }
                         )
                     }
                 }

@@ -141,6 +141,7 @@ import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.ui.SyncWatchType
 import com.lagradost.cloudstream3.ui.WatchType
 import com.lagradost.cloudstream3.ui.account.AccountHelper.showAccountSelectLinear
+import com.lagradost.cloudstream3.ui.account.AvatarCatalog
 import com.lagradost.cloudstream3.ui.download.DOWNLOAD_NAVIGATE_TO
 import com.lagradost.cloudstream3.ui.home.HomeViewModel
 import com.lagradost.cloudstream3.ui.library.LibraryViewModel
@@ -1857,7 +1858,28 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                             }
                         }
 
-                        val floatingItems = remember(selectedId) {
+                        val selectedAccountTick by DataStoreHelper.selectedAccountNumberFlow.collectAsState()
+                        val accountReloadTick = remember { mutableIntStateOf(0) }
+                        DisposableEffect(Unit) {
+                            val listener: (Boolean) -> Unit = {
+                                runOnUiThread {
+                                    accountReloadTick.intValue++
+                                }
+                            }
+                            MainActivity.reloadAccountEvent += listener
+                            onDispose {
+                                MainActivity.reloadAccountEvent -= listener
+                            }
+                        }
+                        val activeAccount = remember(selectedAccountTick, accountReloadTick.intValue) {
+                            DataStoreHelper.getCurrentAccount()
+                                ?: DataStoreHelper.getDefaultAccount(this@MainActivity)
+                        }
+                        val activeAvatarUri = remember(activeAccount) {
+                            AvatarCatalog.resolveAvatar(this@MainActivity, activeAccount)
+                        }
+
+                        val floatingItems = remember(selectedId, activeAccount, activeAvatarUri) {
                             listOf(
                                 FloatingNavigationItem(
                                     label = getString(R.string.title_home),
@@ -1909,13 +1931,14 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                                     selectedDrawableRes = R.drawable.library_icon_filled,
                                 ),
                                 FloatingNavigationItem(
-                                    label = getString(R.string.title_settings),
+                                    label = activeAccount.name.ifBlank { getString(R.string.title_settings) },
                                     selected = selectedId == R.id.navigation_settings,
                                     onClick = {
                                         if (selectedId != R.id.navigation_settings) {
                                             navController.navigate(R.id.navigation_settings)
                                         }
                                     },
+                                    avatarUri = activeAvatarUri,
                                     drawableRes = R.drawable.sidebar_settings,
                                     selectedDrawableRes = R.drawable.settings_icon_filled,
                                 ),
@@ -2272,9 +2295,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
     fun triggerHomeRefresh() {
         try {
             val homeViewModel = ViewModelProvider(this)[HomeViewModel::class.java]
-            val currentApi = homeViewModel.apiName.value ?: DataStoreHelper.currentHomePage ?: noneApi.name
+            val currentApi = DataStoreHelper.currentHomePage ?: noneApi.name
             homeViewModel.reloadStored()
-            homeViewModel.loadAndCancel(currentApi, forceReload = true, fromUI = true)
+            homeViewModel.loadAndCancel(currentApi, forceReload = true, fromUI = false)
             showToast(R.string.action_reload, Toast.LENGTH_SHORT)
         } catch (e: Throwable) {
             logError(e)

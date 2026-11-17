@@ -63,7 +63,7 @@
                     android:layout_gravity="center"
                     android:contentDescription="@string/preview_background_img_des"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/profile_bg_blue" />
+                    tools:src="@drawable/default_cover" />
             </androidx.cardview.widget.CardView>
 
             <androidx.cardview.widget.CardView

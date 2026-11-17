@@ -1,32 +1,39 @@
 package com.lagradost.cloudstream3.ui.home
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.lagradost.cloudstream3.ui.AppIcons as Icons
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,61 +51,112 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.isMovieType
 import com.lagradost.cloudstream3.ui.poster.CardDepthSurface
 import com.lagradost.cloudstream3.ui.poster.cardDepth
-import com.lagradost.cloudstream3.ui.poster.rememberPosterCardStyleUiState
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.DataStoreHelper.fixVisual
 import kotlin.math.roundToInt
 
-private val ContinueWatchingCardWidth = 224.dp
-private val ContinueWatchingCardHeight = 126.dp
+private val ContinueWatchingCardWidth = 170.dp
+private val CardPlaceholderColor = Color(0xFF17171A)
+private val TitleTextColor = Color(0xFFF5F5F7)
+private val ActionTextColor = Color(0xFF9A9AA2)
+private val SubtitleTextColor = Color(0xFF8E8E93)
 
 @Composable
 fun HomeContinueWatchingSection(
     title: String,
     items: List<SearchResponse>,
     onItemClick: (SearchResponse) -> Unit,
-    onItemLongClick: (SearchResponse) -> Unit,
+    onPlayClick: (SearchResponse) -> Unit,
+    onRemoveClick: (SearchResponse) -> Unit,
     onViewAllClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) return
 
-    val posterStyle = rememberPosterCardStyleUiState()
-    val cornerRadius = posterStyle.cornerRadiusDp.coerceIn(6, 16).dp
-
-    ShelfSection(
-        title = title,
-        actionLabel = "View All",
-        onActionClick = onViewAllClick,
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(
-            items = items,
-            key = { item -> "cw_${item.id ?: item.url}_${item.name}" },
-        ) { item ->
-            ContinueWatchingCard(
-                item = item,
-                cornerRadius = cornerRadius,
-                onClick = { onItemClick(item) },
-                onLongClick = { onItemLongClick(item) },
+        // 1. Header Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TitleTextColor,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+
+            if (onViewAllClick != null) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickable(onClick = onViewAllClick)
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = "View All",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = ActionTextColor,
+                        ),
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "View All",
+                        tint = ActionTextColor,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            }
+        }
+
+        // 2. High-Performance LazyRow for 10+ items
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(
+                items = items,
+                key = { item -> item.id ?: "cw_${item.url}_${item.name}" },
+            ) { item ->
+                ContinueWatchingCard(
+                    item = item,
+                    onDetailsClick = { onItemClick(item) },
+                    onPlayClick = { onPlayClick(item) },
+                    onRemoveClick = { onRemoveClick(item) },
+                )
+            }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContinueWatchingCard(
     item: SearchResponse,
-    cornerRadius: androidx.compose.ui.unit.Dp,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    onDetailsClick: () -> Unit,
+    onPlayClick: () -> Unit,
+    onRemoveClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val resumeItem = item as? DataStoreHelper.ResumeWatchingResult
     val fixedPos = remember(resumeItem?.watchPos) { resumeItem?.watchPos?.fixVisual() }
@@ -115,26 +175,34 @@ private fun ContinueWatchingCard(
             null
         }
     }
-    val episodeBadge = remember(resumeItem) {
-        if (resumeItem == null) return@remember null
-        if (resumeItem.type?.isMovieType() == true) {
-            "Movie"
-        } else {
+
+    // Row 2 text formatting: "S1 E1 • 62m left" (or "62m left" for movies)
+    val metadataLine = remember(resumeItem, remainingText) {
+        val epToken = if (resumeItem != null && resumeItem.type?.isMovieType() != true) {
             val s = resumeItem.season
             val e = resumeItem.episode
             when {
-                s != null && s > 0 && e != null -> "S${s}E${e}"
-                e != null -> "E${e}"
-                else -> "Resume"
+                s != null && s > 0 && e != null -> "S$s E$e"
+                e != null -> "E$e"
+                else -> null
             }
+        } else {
+            null
+        }
+
+        when {
+            epToken != null && remainingText != null -> "$epToken • $remainingText"
+            epToken != null -> epToken
+            remainingText != null -> remainingText
+            else -> "Resume"
         }
     }
 
-    val shape = RoundedCornerShape(cornerRadius)
+    val cardShape = RoundedCornerShape(12.dp)
     val context = LocalContext.current
     val density = LocalDensity.current
     val widthPx = with(density) { ContinueWatchingCardWidth.roundToPx() }
-    val heightPx = with(density) { ContinueWatchingCardHeight.roundToPx() }
+    val heightPx = with(density) { (ContinueWatchingCardWidth * 9f / 16f).roundToPx() }
     val imageRequest = remember(context, item.posterUrl, widthPx, heightPx) {
         item.posterUrl?.takeIf { it.isNotBlank() }?.let { url ->
             ImageRequest.Builder(context)
@@ -145,156 +213,233 @@ private fun ContinueWatchingCard(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .width(ContinueWatchingCardWidth)
-            .height(ContinueWatchingCardHeight)
-            .cardDepth(
-                shape = shape,
-                surface = CardDepthSurface.POSTER,
-            )
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
-            ),
+    Column(
+        modifier = modifier.width(ContinueWatchingCardWidth),
     ) {
-        if (imageRequest != null) {
-            AsyncImage(
-                model = imageRequest,
-                contentDescription = item.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        }
-
-        // Dark gradient overlay for ContinueWatchingCard
+        // Clean 16:9 Thumbnail Card
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.12f),
-                            Color.Black.copy(alpha = 0.38f),
-                            Color.Black.copy(alpha = 0.88f),
-                        ),
-                    ),
-                ),
-        )
-
-        // Top row: remaining time badge + more options button
-        Row(
-            modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+                .aspectRatio(16f / 9f)
+                .cardDepth(
+                    shape = cardShape,
+                    surface = CardDepthSurface.POSTER,
+                )
+                .clip(cardShape)
+                .background(CardPlaceholderColor)
+                .clickable(onClick = onDetailsClick),
         ) {
-            if (remainingText != null) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = Color.Black.copy(alpha = 0.68f),
-                ) {
-                    Text(
-                        text = remainingText,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = Color.White.copy(alpha = 0.92f),
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.width(1.dp))
-            }
-
-            Surface(
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.56f),
-                modifier = Modifier
-                    .size(26.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onLongClick),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Options",
-                        tint = Color.White,
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
-            }
-        }
-
-        // Bottom content: Episode badge + title + play button + progress bar
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    if (!episodeBadge.isNullOrBlank()) {
-                        Text(
-                            text = episodeBadge.uppercase(),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                letterSpacing = 0.8.sp,
-                            ),
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
-                    }
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Surface(
-                    shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.92f),
-                    contentColor = Color.Black,
-                    modifier = Modifier.size(28.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Resume",
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-            }
-
-            if (progressFraction > 0f) {
-                Spacer(modifier = Modifier.height(2.dp))
-                PosterProgressBar(
-                    progress = progressFraction,
-                    modifier = Modifier.fillMaxWidth(),
+            if (imageRequest != null) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = item.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
             }
+
+            // Tight bottom scrim gradient covering only bottom 32% of thumbnail
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .fillMaxSize(0.32f)
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.70f),
+                        ),
+                    ),
+            )
+
+            // Small, crisp white Play triangle icon in bottom-left corner
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Resume",
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = 10.dp)
+                    .size(13.dp),
+            )
+
+            // Edge-to-edge flush bottom progress bar (3.5.dp) placed LAST to render on top
+            HotstarProgressBar(
+                progress = progressFraction,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(3.5.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(7.dp))
+
+        // Clean 2-Line Metadata Block Below Thumbnail
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onDetailsClick),
+        ) {
+            // Row 1: Title + 3-Dot Menu
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TitleTextColor,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+
+                // Compact vertical 3-dot overflow icon anchored to modern Material 3 DropdownMenu
+                var showOptionsMenu by remember { mutableStateOf(false) }
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .clickable { showOptionsMenu = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_baseline_more_vert_24),
+                            contentDescription = "Options",
+                            tint = ActionTextColor,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showOptionsMenu,
+                        onDismissRequest = { showOptionsMenu = false },
+                        containerColor = CardPlaceholderColor,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.home_play),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                    color = TitleTextColor,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = TitleTextColor,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                            onClick = {
+                                showOptionsMenu = false
+                                onPlayClick()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.action_open_watching),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                    color = TitleTextColor,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = TitleTextColor,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                            onClick = {
+                                showOptionsMenu = false
+                                onDetailsClick()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.action_remove_watching),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                    color = Color(0xFFFF6B6B),
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF6B6B),
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                            onClick = {
+                                showOptionsMenu = false
+                                onRemoveClick()
+                            },
+                        )
+                    }
+                }
+            }
+
+            // Row 2: Episode & Time Left
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = metadataLine,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = SubtitleTextColor,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
+
+@Composable
+private fun HotstarProgressBar(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    trackColor: Color = Color.White.copy(alpha = 0.28f),
+    indicatorColor: Color = MaterialTheme.colorScheme.primary,
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0.05f, 1f),
+        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+        label = "hotstarProgressBar",
+    )
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(3.5.dp)
+            .background(trackColor),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(animatedProgress)
+                .height(3.5.dp)
+                .background(indicatorColor),
+        )
+    }
+}
+
 

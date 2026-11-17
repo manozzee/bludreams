@@ -89,7 +89,7 @@ fun BasePreferenceWidget(
                         overflow = TextOverflow.Ellipsis,
                         maxLines = 2,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.plusJakartaSans,
                             fontWeight = FontWeight.Medium,
                             color = Color.White,
                             fontSize = 15.sp,

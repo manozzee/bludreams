@@ -312,7 +312,7 @@ class HomeViewModel : ViewModel() {
     fun loadMoreHomeScrollResponses() {
         addJob = ioSafe {
             updatePreviewResponses(previewResponses, previewResponsesAdded, currentShuffledList, 1)
-            _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
+            _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses.toList()))
         }
     }
 
@@ -383,7 +383,7 @@ class HomeViewModel : ViewModel() {
                                     previewResponses,
                                     previewResponsesAdded,
                                     randomItems,
-                                    3
+                                    6
                                 )
 
                                 _randomItems.postValue(randomItems)
@@ -398,7 +398,7 @@ class HomeViewModel : ViewModel() {
                                 )
                             )
                         } else {
-                            _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
+                            _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses.toList()))
                         }
                         _page.postValue(Resource.Success(HashMap(expandable)))
                     } catch (e: Exception) {
@@ -525,9 +525,15 @@ class HomeViewModel : ViewModel() {
             // api?.let { expandable[it.name]?.list?.list?.isNotEmpty() } == true
             val currentPage = page.value
 
-            // if we don't need to reload and we have a valid homepage or currently loading the same thing then return
+            // if we don't need to reload and we have a valid homepage for the same target or currently loading the same thing then return
             val currentLoading = isCurrentlyLoadingName
-            if (!forceReload && (currentPage is Resource.Success && currentPage.value.isNotEmpty() || (currentLoading != null && currentLoading == preferredApiName))) {
+            val loadedApiName = repo?.name ?: _apiName.value
+            val matchesPreferred = when (preferredApiName) {
+                null -> loadedApiName == noneApi.name
+                randomApi.name -> loadedApiName != null && loadedApiName != noneApi.name
+                else -> loadedApiName == preferredApiName
+            }
+            if (!forceReload && ((matchesPreferred && currentPage is Resource.Success && currentPage.value.isNotEmpty()) || (currentLoading != null && currentLoading == preferredApiName))) {
                 return@ioSafe
             }
 

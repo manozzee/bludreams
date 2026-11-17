@@ -1086,8 +1086,11 @@
             </RelativeLayout>
         </LinearLayout>
 
-
-
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/player_compose_hud"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
 
     </FrameLayout>
 

@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,7 +60,6 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.mvvm.Resource
 import com.lagradost.cloudstream3.ui.APIRepository.Companion.noneApi
-import com.lagradost.cloudstream3.ui.WatchType
 import com.lagradost.cloudstream3.ui.home.HomeFragment.Companion.getDisplayName
 import com.lagradost.cloudstream3.ui.liquidglass.HomeHeroSection
 import com.lagradost.cloudstream3.ui.liquidglass.MetaPreview
@@ -151,8 +149,6 @@ fun HomeScreen(
     pageResource: Resource<Map<String, HomeViewModel.ExpandableHomepageList>>?,
     previewResource: Resource<Pair<Boolean, List<LoadResponse>>>?,
     resumeWatching: List<SearchResponse>,
-    bookmarks: Pair<Boolean, List<SearchResponse>>,
-    availableWatchStatusTypes: Pair<Set<WatchType>, Set<WatchType>>,
     currentAccount: DataStoreHelper.Account? = null,
     onSelectProviderClick: () -> Unit = {},
     onReloadProviderClick: () -> Unit = {},
@@ -164,14 +160,13 @@ fun HomeScreen(
     onHeroPlayClick: (MetaPreview, LoadResponse?, SearchResponse?) -> Unit,
     onHeroBookmarkClick: (MetaPreview, LoadResponse?, SearchResponse?) -> Unit,
     isHeroBookmarked: (MetaPreview, LoadResponse?, SearchResponse?) -> Boolean,
+    onHeroShareClick: (MetaPreview, LoadResponse?, SearchResponse?) -> Unit = { _, _, _ -> },
     onLoadMoreHero: () -> Unit,
     onContinueWatchingClick: (SearchResponse) -> Unit,
-    onContinueWatchingLongClick: (SearchResponse) -> Unit,
+    onContinueWatchingPlayClick: (SearchResponse) -> Unit,
+    onContinueWatchingRemoveClick: (SearchResponse) -> Unit,
     onContinueWatchingViewAll: () -> Unit,
-    onWatchTypeToggle: (Set<WatchType>) -> Unit,
-    onBookmarksViewAll: (String, List<SearchResponse>) -> Unit,
     onCatalogItemClick: (SearchResponse) -> Unit,
-    onCatalogItemLongClick: (SearchResponse) -> Unit,
     onCatalogViewAllClick: (HomeViewModel.ExpandableHomepageList) -> Unit,
     onCatalogExpand: (String) -> Unit,
     onOpenInBrowserClick: () -> Unit,
@@ -242,6 +237,9 @@ fun HomeScreen(
                         isBookmarked = { meta ->
                             isHeroBookmarked(meta, meta.originalLoadResponse, meta.originalResponse)
                         },
+                        onShareClick = { meta ->
+                            onHeroShareClick(meta, meta.originalLoadResponse, meta.originalResponse)
+                        },
                         onNearEndReached = onLoadMoreHero,
                     )
                 } else {
@@ -256,33 +254,14 @@ fun HomeScreen(
                         title = stringResource(R.string.continue_watching),
                         items = resumeWatching,
                         onItemClick = onContinueWatchingClick,
-                        onItemLongClick = onContinueWatchingLongClick,
+                        onPlayClick = onContinueWatchingPlayClick,
+                        onRemoveClick = onContinueWatchingRemoveClick,
                         onViewAllClick = onContinueWatchingViewAll,
                     )
                 }
             }
 
-            // 3. BOOKMARKS / WATCHLIST SECTION
-            val (checkedWatchTypes, visibleWatchTypes) = availableWatchStatusTypes
-            val (bookmarksVisible, bookmarkItems) = bookmarks
-            if (visibleWatchTypes.isNotEmpty()) {
-                item(key = "home_bookmarks_section") {
-                    HomeBookmarksSection(
-                        checkedWatchTypes = checkedWatchTypes,
-                        visibleWatchTypes = visibleWatchTypes,
-                        bookmarksVisible = bookmarksVisible,
-                        bookmarkItems = bookmarkItems,
-                        onWatchTypeToggle = onWatchTypeToggle,
-                        onItemClick = onCatalogItemClick,
-                        onItemLongClick = onCatalogItemLongClick,
-                        onViewAllClick = { title ->
-                            onBookmarksViewAll(title, bookmarkItems)
-                        },
-                    )
-                }
-            }
-
-            // 4. LOADING / ERROR / EMPTY PROVIDER STATES
+            // 3. LOADING / ERROR / EMPTY PROVIDER STATES
             when (pageResource) {
                 is Resource.Loading -> {
                     if (catalogSections.isEmpty()) {
@@ -348,7 +327,6 @@ fun HomeScreen(
                                         item = item,
                                         forceShape = forceShape,
                                         onClick = { onCatalogItemClick(item) },
-                                        onLongClick = { onCatalogItemLongClick(item) },
                                     )
                                 }
                             }
@@ -358,101 +336,6 @@ fun HomeScreen(
             }
         }
 
-    }
-}
-
-@Composable
-private fun HomeBookmarksSection(
-    checkedWatchTypes: Set<WatchType>,
-    visibleWatchTypes: Set<WatchType>,
-    bookmarksVisible: Boolean,
-    bookmarkItems: List<SearchResponse>,
-    onWatchTypeToggle: (Set<WatchType>) -> Unit,
-    onItemClick: (SearchResponse) -> Unit,
-    onItemLongClick: (SearchResponse) -> Unit,
-    onViewAllClick: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    val orderedTypes = remember(visibleWatchTypes) {
-        listOf(
-            WatchType.WATCHING,
-            WatchType.COMPLETED,
-            WatchType.ONHOLD,
-            WatchType.DROPPED,
-            WatchType.PLANTOWATCH,
-        ).filter { visibleWatchTypes.contains(it) }
-    }
-    val selectedTypes = orderedTypes.filter { checkedWatchTypes.contains(it) }
-    val activeTitle = if (selectedTypes.isNotEmpty()) {
-        selectedTypes.map { stringResource(it.stringRes) }.joinToString(", ")
-    } else {
-        "Bookmarks"
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(orderedTypes, key = { it.internalId }) { watchType ->
-                val isSelected = checkedWatchTypes.contains(watchType)
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-                    } else {
-                        Color.White.copy(alpha = 0.06f)
-                    },
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            Color.White.copy(alpha = 0.12f)
-                        },
-                    ),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .clickable {
-                            if (isSelected && checkedWatchTypes.size == 1) {
-                                onWatchTypeToggle(emptySet())
-                            } else {
-                                onWatchTypeToggle(setOf(watchType))
-                            }
-                        },
-                ) {
-                    Text(
-                        text = stringResource(watchType.stringRes),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-
-        if (bookmarksVisible && bookmarkItems.isNotEmpty()) {
-            ShelfSection(
-                title = activeTitle,
-                actionLabel = "View All",
-                onActionClick = { onViewAllClick(activeTitle) },
-            ) {
-                items(
-                    items = bookmarkItems,
-                    key = { item -> "bm_${item.id ?: item.url}_${item.name}" },
-                ) { item ->
-                    PosterCardFromSearchResponse(
-                        item = item,
-                        onClick = { onItemClick(item) },
-                        onLongClick = { onItemLongClick(item) },
-                    )
-                }
-            }
-        }
     }
 }
 

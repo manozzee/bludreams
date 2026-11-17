@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.lagradost.cloudstream3.ui.AppIcons
 
 /**
- * Delegates to centralized [AppIcons] Phosphor Icons mapping.
+ * Delegates to centralized [AppIcons] Solar Icons mapping.
  */
 internal object LiquidGlassIcons {
     val Sort: ImageVector get() = AppIcons.Sort

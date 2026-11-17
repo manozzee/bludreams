@@ -181,6 +181,7 @@ class SettingsUI : BasePreferenceFragmentCompat() {
             with(context) {
                 selectHomepage(currentHome) { selectedApi ->
                     DataStoreHelper.currentHomePage = selectedApi
+                    MainActivity.reloadHomeEvent(true)
                     updateHomeSourceSummary()
                 }
             }

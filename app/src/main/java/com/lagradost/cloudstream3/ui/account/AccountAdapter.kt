@@ -113,17 +113,10 @@ class AccountAdapter(
 
             root.setOnClickListener {
                 val accounts = this@AccountAdapter.immutableCurrentList
-
-                val remainingImages =
-                    DataStoreHelper.profileImages.toSet() - accounts.filter { it.customImage == null }
-                        .mapNotNull { DataStoreHelper.profileImages.getOrNull(it.defaultImageIndex) }
-                        .toSet()
-
-                val image =
-                    DataStoreHelper.profileImages.indexOf(
-                        remainingImages.randomOrNull()
-                            ?: DataStoreHelper.profileImages.random()
-                    )
+                val avatars = AvatarCatalog.getAvatars(root.context)
+                val usedAvatars = accounts.mapNotNull { AvatarCatalog.resolveAvatar(root.context, it) }.toSet()
+                val nextAvatar = (avatars - usedAvatars).firstOrNull() ?: avatars.firstOrNull()
+                val avatarIndex = nextAvatar?.let { avatars.indexOf(it).coerceAtLeast(0) } ?: 0
                 val keyIndex = (accounts.maxOfOrNull { it.keyIndex } ?: 0) + 1
 
                 val accountName = root.context.getString(R.string.account)
@@ -134,7 +127,8 @@ class AccountAdapter(
                         keyIndex = keyIndex,
                         name = "$accountName $keyIndex",
                         customImage = null,
-                        defaultImageIndex = image
+                        defaultImageIndex = avatarIndex,
+                        avatar = nextAvatar,
                     ),
                     isNewAccount = true,
                     accountEditCallback = { account -> accountCreateCallback.invoke(account) },

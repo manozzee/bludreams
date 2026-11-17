@@ -1,127 +1,102 @@
 <div align="center">
 
-  <img src="app/src/main/ic_launcher-playstore.png" width="130" height="130" alt="BluDreams App Icon" style="border-radius: 30px; box-shadow: 0 12px 32px rgba(37, 99, 235, 0.25);" />
-
   # BluDreams
 
-  ### *Cinema, uninterrupted. Crafted for pure immersion.*
+  ### *Cinema, uninterrupted. Crafted with Liquid Glass.*
 
-  **A modern, ad-free streaming experience built for Android phones.**  
-  *(with experimental preview for Tablets and Android TV)*
+  A modern, ad-free Android streaming shell built on open-source foundations—featuring optical **Liquid Glass** surfaces, **Plus Jakarta Sans & Inter** typography, a full Compose video player HUD, and curated cinema palettes.
 
   <p align="center">
-    <a href="https://github.com/manozzee/bludreams/releases/latest"><img src="https://img.shields.io/github/v/release/manozzee/bludreams?style=for-the-badge&color=2563EB&logo=android&logoColor=white" alt="Latest Release" /></a>
-    <a href="https://github.com/recloudstream/cloudstream"><img src="https://img.shields.io/badge/Fork%20of-CloudStream-F59E0B?style=for-the-badge&logo=github" alt="Fork of CloudStream" /></a>
+    <a href="https://bludreams.golposolpo.com"><img src="https://img.shields.io/badge/Official%20Website-bludreams.golposolpo.com-2563EB?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Official Website" /></a>
+    <a href="https://github.com/manozzee/bludreams/releases/latest"><img src="https://img.shields.io/github/v/release/manozzee/bludreams?style=for-the-badge&color=1D4ED8&logo=android&logoColor=white" alt="Latest Release" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-10B981?style=for-the-badge" alt="License: GPL-3.0" /></a>
-    <img src="https://img.shields.io/badge/Platform-Phone%20%7C%20TV%20%26%20Tablet%20(Beta)-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Platform: Android" />
+    <a href="https://github.com/recloudstream/cloudstream"><img src="https://img.shields.io/badge/Based%20on-CloudStream-F59E0B?style=for-the-badge&logo=github" alt="Based on CloudStream" /></a>
   </p>
 
   <p align="center">
-    <a href="https://github.com/manozzee/bludreams/releases/latest"><b>⚡ Download Latest Release</b></a> •
-    <a href="#-the-feeling"><b>The Feeling</b></a> •
-    <a href="#-signature-cinema-palettes"><b>The Palettes</b></a> •
-    <a href="#-get-started"><b>Get Started</b></a> •
-    <a href="#️-build"><b>Build</b></a>
+    <a href="https://bludreams.golposolpo.com"><b>🌐 Visit Official Website</b></a> •
+    <a href="https://github.com/manozzee/bludreams/releases/latest"><b>⚡ Download APK</b></a> •
+    <a href="#-the-experience"><b>Experience</b></a> •
+    <a href="#-playback--player-hud"><b>Player</b></a> •
+    <a href="#-visual-design--themes"><b>Design</b></a> •
+    <a href="#-installation"><b>Install</b></a>
   </p>
 
 </div>
 
 ---
 
-> [!NOTE]
-> ### 🏛️ The CloudStream Heritage
-> **BluDreams** is born as an elevated, design-forward fork of [CloudStream](https://github.com/recloudstream/cloudstream)—the open-source foundation known and trusted worldwide.  
-> 
-> BluDreams preserves seamless compatibility with existing CloudStream extension catalogs while transforming the everyday interaction feel: introducing our floating **Liquid Glass** navigation island, deep neutral charcoal and true AMOLED blacks, 7 hand-curated cinema palettes, tactile rounded search cards, and a direct GitHub release updater. We celebrate and honor the upstream creators and contributors whose architecture made this possible.
+## ✨ The Experience
+
+BluDreams removes clutter so your shows and movies stay front and center—zero ads, zero tracking, and full compatibility with standard CloudStream extension repositories.
+
+- 🫧 **Optical Liquid Glass UI**: Real-time backdrop refraction and specular glass rims power the floating jelly-motion navigation pill, hero headers, update capsule, and player overlays.
+- 🎬 **Immersive Home & Details**: Full-bleed hero carousels with seamless transparent dissolves, inline trailer playback, quick sharing, and streamlined *Continue Watching* cards.
+- 👤 **Multi-Profile Switching**: A sleek *"Who's Watching?"* selector with bundled character avatars, custom avatar URLs, optional PIN lock, and your active profile avatar displayed right in the navigation bar.
+- 🔄 **Non-Blocking Update Capsule**: Automatic startup checks surface a floating Liquid Glass capsule at the top of the screen with liquid download progress, release notes, and one-tap PackageInstaller / Legacy APK installation.
+- 📦 **Extension & Offline Ready**: Manage extension repositories, customize poster card dimensions and depth effects, and download episodes for offline playback.
 
 ---
 
-## ✨ The Feeling
+## 🎮 Playback & Player HUD
 
-Most streaming apps feel like billboards—cluttered with unskippable ads, noisy sponsored carousels, and algorithms tracking every tap. 
+Every player control and overlay has been rebuilt in Jetpack Compose with matching Kyant Liquid Glass surfaces:
 
-**BluDreams was built to feel different.**  
-From the moment you launch the app, everything steps back so the media takes center stage:
-
-- 🌊 **Floating Liquid Glass**: A translucent, frosted acrylic island floats naturally over your backdrops and movie posters, responding with fluid physics and subtle specular reflections.
-- 🖤 **True AMOLED & Neutral Dark**: Engineered with pure `#000000` blacks for endless contrast and neutral `#0E0E10` elevation layers—zero annoying blue casts or muddy grays.
-- 🚫 **Absolute Peace**: No banners, no commercial interruptions, no analytics tracking, no sign-ups required.
-- 🔍 **Intuitive Search & Pill Cards**: Real-time debounced query suggestions designed as clean rounded 16dp capsules that adapt dynamically as you type.
-- 📥 **Offline Freedom**: Multi-threaded background downloader with resume support so your movies travel with you anywhere.
-- 💬 **Studio-Grade Subtitles**: Crisp typography, adjustable sizing, custom styling, and full support for styled ASS/SSA, SRT, and VTT files.
+- **Full Glass Control Suite**: Edge-to-edge **Episodes Drawer** (season, dub, range & sort filters), **Sources & Subtitles**, **Video & Audio Tracks**, and **Subtitle Delay / Sync**.
+- **Audio & Speed Tuning**: Centered Liquid Glass cards for **Playback Speed** and **Dynamic Range Compressor (DRC)** for clearer dialogue and balanced action scenes.
+- **Natural Touch Gestures**: Slide for brightness or volume, double-tap to seek, hold for `2x` speed-up, and scrub with properly proportioned **Seek Bar Preview** thumbnails.
+- **Subtitle & Stream Tools**: Online subtitle search, custom caption styling, quality priority profiles, live stream edge tracking, and torrent progress/confirmation overlays.
 
 ---
 
-## 🎨 Signature Cinema Palettes
+## 🎨 Visual Design & Themes
 
-Choose the atmosphere that matches your mood. BluDreams features seven signature colorways crafted specifically for dark-room viewing:
-
-| Atmosphere | Tone | Accent | Variant | Focus Ring | The Experience |
-| :---: | :--- | :---: | :---: | :---: | :--- |
-| 🔴 | **Velvet Noir** | `#991B1B` | `#450A10` | `#DC2626` | *Deep theatrical crimson; reminiscent of 35mm auditorium velvet and suspense.* |
-| 🟡 | **Aura Brass** | `#B98A28` | `#59410D` | `#D9A74A` | *Warm golden brass; glowing vintage cinema and classic amber warmth.* |
-| 🟠 | **Smoked Cognac** | `#9A3412` | `#4D1A09` | `#BC4712` | *Warm bourbon amber and embers; rich, earthy, and inviting.* |
-| 🟢 | **Obsidian Pine** | `#065F46` | `#022B20` | `#047857` | *Deep twilight forest and emerald mist; calm, grounded, and atmospheric.* |
-| 🔵 | **Fincher Teal** | `#0E7490` | `#062E2C` | `#0D7972` | *The sharp clinical cyan of modern psychological thrillers; cold and precise.* |
-| 🌌 | **Midnight Lapis** | `#1E40AF` | `#0E1E5B` | `#3B82F6` | *Royal electric blue and neon city lights; vibrant and deep.* |
-| 🟣 | **Nocturne Violet** | `#581C87` | `#2A0844` | `#7022AC` | *Neon amethyst and twilight mysticism; hypnotic and rich.* |
-
-*Prefer system harmony? BluDreams also seamlessly blends with **Dynamic Monet (Material You)** wallpaper colors on Android 12+.*
+- **Typography**: Clean editorial hierarchy pairing **Plus Jakarta Sans** headlines with **Inter** body text and tabular playback timers.
+- **AMOLED & Neutral Dark**: Deep `#000000` pure black AMOLED mode alongside elevated dark charcoal surfaces.
+- **7 Curated Cinema Palettes**: **Velvet Noir**, **Aura Brass**, **Smoked Cognac**, **Obsidian Pine**, **Fincher Teal**, **Midnight Lapis**, and **Nocturne Violet**—plus **Dynamic Monet (Material You)** on Android 12+.
+- **Switchable App Icons**: Choose between custom launcher icons (**Nami** or **Reze**) directly inside **Settings → UI**.
 
 ---
 
-## 📱 Form Factors
+## 📱 Supported Form Factors
 
-BluDreams is crafted first and foremost as a **phone-first handheld experience**. 
-
-- **Android Phones**: The core, fully refined touchscreen experience.
-- **Android TV & Tablets *(Experimental Beta)***: We are actively previewing a 10-foot D-pad leanback interface for TV remotes and responsive widescreen tablet layouts. Early adopters can test and provide feedback as these adaptive layouts mature.
+- **Android Phones**: Primary, fully refined touch and Liquid Glass experience (Android 6.0 / API 23+).
+- **Tablets & Android TV *(Experimental)***: Adaptive layouts and D-pad leanback navigation are included and continue to evolve.
 
 ---
 
-## 🚀 Get Started
+## 🚀 Installation
 
-### 1. Download & Install
-1. Grab the latest **`app-stable-release.apk`** from [GitHub Releases](https://github.com/manozzee/bludreams/releases/latest).
-2. Install the APK on your device *(allow "Install from unknown apps" if prompted)*.
-
-### 2. Plug in Your Extensions
-1. Open **BluDreams**.
-2. Tap **Settings** > **Extensions**.
-3. Add your favorite CloudStream repository link.
-4. Pick and install your providers.
-
-### 3. Enjoy the Show
-Dim the lights, grab some popcorn, and enjoy streaming the way it should have always been.
+1. Visit **[bludreams.golposolpo.com](https://bludreams.golposolpo.com)** or download the latest **`BluDreams-v*.apk`** from **[GitHub Releases](https://github.com/manozzee/bludreams/releases/latest)**.
+2. Install the APK on your Android device *(grant "Install unknown apps" permission if prompted)*.
+3. Open **BluDreams**, go to **Settings → Extensions**, and add your preferred CloudStream repository URL to install providers.
 
 ---
 
 ## 🛠️ Build from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/manozzee/bludreams.git
 cd bludreams
 
-# Build Debug APK
+# Debug build
 ./gradlew :app:assembleStableDebug
 
-# Build Signed Release APK
+# Release build (uses debug signing locally unless keystore.properties or SIGNING_* env vars are set)
 ./gradlew :app:assembleStableRelease
 ```
-
-Artifact output: `app/build/outputs/apk/stable/release/app-stable-release.apk`
 
 ---
 
 ## ⚠️ Disclaimer
 
-**BluDreams does not host, bundle, or index any media content or video streams.**  
-The application is strictly an open-source media player shell. Users are solely responsible for installing their own extensions and ensuring compliance with local laws and media sources.
+**BluDreams does not host, provide, index, or distribute any media content or video streams.**  
+It is strictly an open-source media player and interface. Users are solely responsible for any third-party extensions they install and for complying with applicable local laws.
 
 ---
 
 ## 📄 License & Credits
 
-- Licensed under the [GNU General Public License v3.0 (GPL-3.0)](LICENSE).
-- Proudly built on the open-source legacy of [CloudStream](https://github.com/recloudstream/cloudstream).
+- Released under the **[GNU General Public License v3.0 (GPL-3.0)](LICENSE)**.
+- Built on the open-source architecture of **[CloudStream](https://github.com/recloudstream/cloudstream)**.
+- Liquid Glass backdrop refraction powered by **[Kyant Backdrop & Shapes](https://github.com/Kyant0/AndroidLiquidGlass)** and **[Haze](https://github.com/chrisbanes/haze)**.

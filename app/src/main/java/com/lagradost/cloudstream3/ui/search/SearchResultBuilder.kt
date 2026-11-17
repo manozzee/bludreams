@@ -201,10 +201,6 @@ object SearchResultBuilder {
             bg.setOnClickListener {
                 click(it)
             }
-            bg.setOnLongClickListener {
-                longClick(it)
-                return@setOnLongClickListener true
-            }
         }
         //
         //
@@ -250,9 +246,13 @@ object SearchResultBuilder {
 
         /**/
 
-        itemView.setOnLongClickListener {
-            longClick(it)
-            return@setOnLongClickListener true
+        if (isLayout(TV) && card is DataStoreHelper.ResumeWatchingResult) {
+            itemView.setOnLongClickListener {
+                longClick(it)
+                return@setOnLongClickListener true
+            }
+        } else {
+            itemView.setOnLongClickListener(null)
         }
 
         /*bg.setOnFocusChangeListener { view, b ->

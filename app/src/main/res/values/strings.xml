@@ -397,8 +397,7 @@
     <string name="phone_layout">Phone layout</string>
     <string name="emulator_layout">Emulator layout</string>
     <string name="primary_color_settings">Primary color</string>
-    <string name="pure_black_settings">Pure Black (AMOLED)</string>
-    <string name="pure_black_settings_des">Use true #000000 black backgrounds for OLED displays and battery savings</string>
+    <string name="pure_black_settings">AMOLED</string>
     <string name="app_theme_settings">App theme</string>
     <string name="bottom_title_settings">Poster title location</string>
     <string name="bottom_title_settings_des">Put the title under the poster</string>
@@ -820,5 +819,22 @@
         <item quantity="other">%d downloads queued</item>
     </plurals>
     <string name="player_is_live">Live</string>
+    <string name="player_unlock_label">Unlock</string>
+    <string name="player_play_pause_desc">Play or pause</string>
+    <string name="player_replay_desc">Replay</string>
+    <string name="player_speedup_2x">2x</string>
+    <string name="player_torrent_progress_desc">Torrent download progress</string>
+    <string name="player_episode_playing">Playing</string>
+    <string name="player_close_episodes_desc">Close episodes</string>
     <string name="installed_plugins">Installed plugins</string>
+    <string name="update_available_subtitle">Update available</string>
+    <string name="update_ready_title">Update ready</string>
+    <string name="update_install_action">Install</string>
+    <string name="update_checking_title">Checking for updates…</string>
+    <string name="update_retry_action">Retry</string>
+    <string name="update_changelog_action_desc">Release notes and options</string>
+    <string name="update_dismiss_desc">Dismiss</string>
+    <string name="update_current_version_format" formatted="true">Current: %1$s</string>
+    <string name="update_no_changelog">No release notes provided.</string>
+    <string name="update_error_details_title">Update Error</string>
 </resources>

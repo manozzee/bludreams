@@ -1,5 +1,6 @@
 package com.lagradost.cloudstream3.ui.liquidglass
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,68 @@ internal data class JellyFrame(
     val glowOpacity: Float = 0f,
 )
 
+@Immutable
+internal data class TabSlotBounds(
+    val leftDp: Float = 0f,
+    val widthDp: Float = 0f,
+) {
+    val centerDp: Float get() = leftDp + widthDp / 2f
+    val rightDp: Float get() = leftDp + widthDp
+}
+
+internal class TabSlotRegistry(count: Int) {
+    private var slots: Array<TabSlotBounds> = Array(count.coerceAtLeast(1)) { TabSlotBounds() }
+
+    fun resize(newCount: Int) {
+        val safeCount = newCount.coerceAtLeast(1)
+        if (slots.size != safeCount) {
+            slots = Array(safeCount) { TabSlotBounds() }
+        }
+    }
+
+    fun update(visualIndex: Int, leftDp: Float, widthDp: Float) {
+        if (visualIndex in slots.indices) {
+            slots[visualIndex] = TabSlotBounds(leftDp, widthDp)
+        }
+    }
+
+    fun isReady(expectedCount: Int): Boolean {
+        if (expectedCount <= 0 || slots.size != expectedCount) return false
+        return slots.all { it.widthDp > 0f }
+    }
+
+    fun get(visualIndex: Int): TabSlotBounds =
+        slots.getOrElse(visualIndex) { TabSlotBounds() }
+
+    fun indexAt(xDp: Double): Int {
+        if (slots.isEmpty()) return 0
+        for (i in slots.indices) {
+            val slot = slots[i]
+            if (xDp <= slot.rightDp || i == slots.lastIndex) {
+                return i
+            }
+        }
+        return slots.lastIndex
+    }
+
+    fun fractionalIndexAt(xDp: Double): Double {
+        if (slots.size <= 1) return 0.0
+        val firstCenter = slots.first().centerDp.toDouble()
+        val lastCenter = slots.last().centerDp.toDouble()
+        if (xDp <= firstCenter) return 0.0
+        if (xDp >= lastCenter) return (slots.size - 1).toDouble()
+        for (i in 0 until slots.lastIndex) {
+            val c0 = slots[i].centerDp.toDouble()
+            val c1 = slots[i + 1].centerDp.toDouble()
+            if (xDp <= c1) {
+                val span = (c1 - c0).coerceAtLeast(1.0)
+                return i + ((xDp - c0) / span).coerceIn(0.0, 1.0)
+            }
+        }
+        return (slots.size - 1).toDouble()
+    }
+}
+
 @Stable
 internal class JellyMotion(initialIndex: Int, count: Int) {
     private val position = JellySpring(initialIndex.coerceAtLeast(0).toDouble(), 1000.0, 1.0)
@@ -43,15 +106,18 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
     private var downX = 0.0
     private var downY = 0.0
     private var dragStartTarget = target
+    private var dragStartCenter = 0.0
     private var dragStartPanel = 0.0
     private var dragStartY = 0.0
     private var movedDistance = 0.0
     private var originX = 0.0
     private var width = 0.0
-    private var height = 64.0
+    private var height = 54.0
     private var tabCount = count
     private val maxIndex get() = (tabCount - 1).coerceAtLeast(0)
-    private val tabWidth get() = ((width - 8) / tabCount.coerceAtLeast(1)).coerceAtLeast(0.0)
+    private val tabWidth get() = ((width - 16) / tabCount.coerceAtLeast(1)).coerceAtLeast(0.0)
+
+    internal val slotRegistry = TabSlotRegistry(count)
 
     var dragging = false
         private set
@@ -64,10 +130,13 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
         this.width = width.toDouble()
         this.height = height.toDouble()
         tabCount = count
+        slotRegistry.resize(count)
         target = target.coerceIn(0.0, maxIndex.toDouble())
         if (!dragging) originX = this.width / 2
         publish()
     }
+
+    fun visualIndexAt(xDp: Float): Int = indexAt(xDp.toDouble())
 
     fun select(index: Int) {
         dragging = false
@@ -84,8 +153,15 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
         originX = downX.coerceIn(0.0, width)
         dragStartY = trackY.value
         movedDistance = 0.0
-        if (tabWidth > 0) target = indexAt(downX).toDouble()
+        if (slotRegistry.isReady(tabCount) || tabWidth > 0) {
+            target = indexAt(downX).toDouble()
+        }
         dragStartTarget = target
+        dragStartCenter = if (slotRegistry.isReady(tabCount)) {
+            slotRegistry.get(dragStartTarget.toInt().coerceIn(0, maxIndex)).centerDp.toDouble()
+        } else {
+            8.0 + (dragStartTarget + 0.5) * tabWidth
+        }
         dragStartPanel = panel.value
         dragging = true
         releasePending = false
@@ -96,10 +172,16 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
     }
 
     fun drag(x: Float, y: Float) {
-        if (!dragging || tabWidth <= 0) return
+        if (!dragging) return
         val dx = x.toDouble()
         val dy = y.toDouble()
-        target = (dragStartTarget + dx / tabWidth).coerceIn(0.0, maxIndex.toDouble())
+        if (slotRegistry.isReady(tabCount)) {
+            target = slotRegistry.fractionalIndexAt(dragStartCenter + dx).coerceIn(0.0, maxIndex.toDouble())
+        } else if (tabWidth > 0) {
+            target = (dragStartTarget + dx / tabWidth).coerceIn(0.0, maxIndex.toDouble())
+        } else {
+            return
+        }
         panel.snapTo(dragStartPanel + dx)
         trackY.snapTo(dragStartY + jellyRubberBand(dy, height) * 0.25)
         trackX.snapTo(1 - (abs(dy) / 700).coerceAtMost(1.0) * 0.08)
@@ -109,8 +191,11 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
     }
 
     fun finish(): Int {
-        val index = if (movedDistance < 4 && tabWidth > 0) indexAt(downX)
-        else floor(target + 0.5).toInt().coerceIn(0, maxIndex)
+        val index = if (movedDistance < 4 && (slotRegistry.isReady(tabCount) || tabWidth > 0)) {
+            indexAt(downX)
+        } else {
+            floor(target + 0.5).toInt().coerceIn(0, maxIndex)
+        }
         dragging = false
         panel.velocity = 0.0
         target = index.toDouble()
@@ -153,7 +238,12 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
             !trackPress.isAtRest(1.0) || !glow.isAtRest(0.0)
     }
 
-    private fun indexAt(x: Double): Int = floor((x - 4) / tabWidth).toInt().coerceIn(0, maxIndex)
+    private fun indexAt(x: Double): Int =
+        if (slotRegistry.isReady(tabCount)) {
+            slotRegistry.indexAt(x)
+        } else {
+            floor((x - 8) / tabWidth.coerceAtLeast(1.0)).toInt().coerceIn(0, maxIndex)
+        }
 
     private fun publish() {
         val speed = velocity.value / 10
@@ -165,10 +255,12 @@ internal class JellyMotion(initialIndex: Int, count: Int) {
             panelOffset = jellyPanelOffset(panel.value, width),
             trackScale = trackPress.value.toFloat(),
             trackScaleX = trackX.value.toFloat(),
-            trackOffsetY = trackY.value.toFloat(),
+            trackOffsetY = trackY.toFloatSafe(),
             originX = originX.toFloat(),
             glowY = downY.toFloat(),
             glowOpacity = glow.value.toFloat().coerceIn(0f, 1f),
         )
     }
+
+    private fun JellySpring.toFloatSafe(): Float = value.toFloat()
 }

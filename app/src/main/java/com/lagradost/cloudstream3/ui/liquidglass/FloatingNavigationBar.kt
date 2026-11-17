@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -69,6 +71,7 @@ data class FloatingNavigationItem(
     val selectedIcon: ImageVector? = null,
     @DrawableRes val drawableRes: Int? = null,
     @DrawableRes val selectedDrawableRes: Int? = null,
+    val avatarUri: String? = null,
     val content: (@Composable (onClick: () -> Unit) -> Unit)? = null,
 )
 
@@ -144,7 +147,7 @@ fun FloatingNavigationBar(
     )
     val tokens = MaterialTheme.liquidGlass
     val accentColor = tokens.colors.accent
-    val selectedSurface = accentColor.copy(alpha = 0.45f)
+    val selectedSurface = accentColor.copy(alpha = 1f)
     val labelFraction by animateFloatAsState(
         targetValue = scrollState?.labelVisibility ?: 1f,
         animationSpec = tween(LiquidGlassTokens.Motion.sheetEnterMillis, easing = LiquidGlassTokens.Motion.standard),
@@ -159,8 +162,7 @@ fun FloatingNavigationBar(
     val currentIsRtl by rememberUpdatedState(isRtl)
     val density = LocalDensity.current
     val hapticFeedback = LocalHapticFeedback.current
-    val trackHeight = 48.dp + (if (compactSize) 8.dp else 16.dp) * labelFraction
-    val horizontalPadding = 58.dp - 30.dp * labelFraction
+    val trackHeight = if (compactSize) 50.dp else 54.dp
 
     LaunchedEffect(visualSelectedIndex, items.size) {
         motion.select(visualSelectedIndex)
@@ -180,13 +182,13 @@ fun FloatingNavigationBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(contentPadding)
-            .padding(horizontal = horizontalPadding),
+            .padding(horizontal = 16.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Box(
             modifier = Modifier
                 .widthIn(max = 400.dp)
-                .fillMaxWidth()
+                .wrapContentWidth()
                 .height(trackHeight)
                 .onSizeChanged {
                     motion.resize(it.width / density.density, it.height / density.density, items.size)
@@ -197,7 +199,8 @@ fun FloatingNavigationBar(
         ) {
             Box(
                 modifier = Modifier
-                    .matchParentSize()
+                    .wrapContentWidth()
+                    .fillMaxHeight()
                     .graphicsLayer {
                         val frame = motion.frame
                         scaleX = frame.trackScale
@@ -206,7 +209,8 @@ fun FloatingNavigationBar(
             ) {
                 Box(
                     modifier = Modifier
-                        .matchParentSize()
+                        .wrapContentWidth()
+                        .fillMaxHeight()
                         .graphicsLayer {
                             val frame = motion.frame
                             transformOrigin = TransformOrigin(
@@ -219,7 +223,8 @@ fun FloatingNavigationBar(
                 ) {
                     Box(
                         modifier = Modifier
-                            .matchParentSize()
+                            .wrapContentWidth()
+                            .fillMaxHeight()
                             .graphicsLayer { translationX = motion.frame.panelOffset * density.density },
                     ) {
                         Box(
@@ -244,17 +249,27 @@ fun FloatingNavigationBar(
                             }
                         }
                         Box(
-                            Modifier.matchParentSize().drawWithContent {
-                                if (selectedIndex >= 0) {
-                                    clipPath(jellyPillPath(motion.frame, items.size), ClipOp.Difference) {
-                                        this@drawWithContent.drawContent()
+                            Modifier
+                                .wrapContentWidth()
+                                .fillMaxHeight()
+                                .drawWithContent {
+                                    if (selectedIndex >= 0) {
+                                        clipPath(jellyPillPath(motion.frame, items.size, motion.slotRegistry), ClipOp.Difference) {
+                                            this@drawWithContent.drawContent()
+                                        }
+                                    } else {
+                                        drawContent()
                                     }
-                                } else {
-                                    drawContent()
-                                }
-                            },
+                                },
                         ) {
-                            JellyTabRow(items, labelFraction, motion, active = false, compactSize = compactSize, modifier = Modifier.matchParentSize())
+                            JellyTabRow(
+                                items = items,
+                                labelFraction = labelFraction,
+                                motion = motion,
+                                active = false,
+                                compactSize = compactSize,
+                                modifier = Modifier.wrapContentWidth().fillMaxHeight(),
+                            )
                         }
                         if (selectedIndex >= 0) {
                             Box(
@@ -262,17 +277,25 @@ fun FloatingNavigationBar(
                                     .clearAndSetSemantics {}
                                     .drawWithContent {
                                         drawJellyPill(
-                                            motion.frame,
-                                            items.size,
-                                            selectedSurface,
-                                            accentColor.copy(alpha = accentColor.alpha * glowStrength),
+                                            frame = motion.frame,
+                                            count = items.size,
+                                            surfaceColor = selectedSurface,
+                                            glowColor = accentColor.copy(alpha = accentColor.alpha * glowStrength),
+                                            slotRegistry = motion.slotRegistry,
                                         ) { drawContent() }
                                     },
                             ) {
-                                JellyTabRow(items, labelFraction, motion, active = true, compactSize = compactSize, modifier = Modifier.matchParentSize())
+                                JellyTabRow(
+                                    items = items,
+                                    labelFraction = labelFraction,
+                                    motion = motion,
+                                    active = true,
+                                    compactSize = compactSize,
+                                    modifier = Modifier.matchParentSize(),
+                                )
                             }
                         }
-                        JellyTabTargets(items, labelFraction, motion, compactSize, Modifier.matchParentSize())
+                        JellyTabTargets(items, motion, compactSize, Modifier.matchParentSize())
                     }
                 }
             }
@@ -314,8 +337,7 @@ internal suspend fun PointerInputScope.detectJellyTabGestures(
 
             val itemsAtDown = currentItems()
             if (itemsAtDown.isNotEmpty() && size.width > 0) {
-                val tabWidth = size.width.toFloat() / itemsAtDown.size
-                val downVisualIndex = (down.position.x / tabWidth).toInt().coerceIn(0, itemsAtDown.size - 1)
+                val downVisualIndex = motion.visualIndexAt(down.position.x / density)
                 val downLogicalIndex = logicalNavIndex(downVisualIndex, itemsAtDown.size, isRtl())
                 val targetItem = itemsAtDown.getOrNull(downLogicalIndex)
                 if (targetItem?.onLongClick != null) {

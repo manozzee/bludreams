@@ -28,7 +28,6 @@ import com.lagradost.cloudstream3.ui.home.PosterCardFromSearchResponse
 import com.lagradost.cloudstream3.ui.liquidglass.LiquidGlassTheme
 import com.lagradost.cloudstream3.ui.liquidglass.PosterShape
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
-import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_SHOW_METADATA
 import com.lagradost.cloudstream3.ui.search.SearchClickCallback
 import com.lagradost.cloudstream3.ui.search.SearchResultBuilder
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
@@ -254,16 +253,6 @@ open class HomeChildItemAdapter(
                                     )
                                 )
                             },
-                            onLongClick = {
-                                clickCallback(
-                                    SearchClickCallback(
-                                        action = SEARCH_ACTION_SHOW_METADATA,
-                                        view = holder.itemView,
-                                        position = position,
-                                        card = item
-                                    )
-                                )
-                            }
                         )
                     }
                 }

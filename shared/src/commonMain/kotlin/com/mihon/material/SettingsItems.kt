@@ -469,7 +469,7 @@ private fun BaseSettingsItem(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium.copy(
-                fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                fontFamily = com.lagradost.cloudstream4.theme.AppFont.plusJakartaSans,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
             ),
         )

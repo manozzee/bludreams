@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.FragmentActivity
@@ -24,12 +25,12 @@ import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.DataStoreHelper.Account
 import com.lagradost.cloudstream3.utils.UIHelper.enableEdgeToEdgeCompat
 import com.lagradost.cloudstream3.utils.UIHelper.openActivity
-import com.lagradost.cloudstream3.utils.UIHelper.setNavigationBarColorCompat
 import com.lagradost.cloudstream4.AppSettings
 import com.lagradost.cloudstream4.compose.CloudStreamThemeAppSettings
 import com.lagradost.cloudstream4.state.SearchableData
 import com.lagradost.cloudstream4.state.sortByInt
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toImmutableList
 
 class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
     companion object {
@@ -44,7 +45,7 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
         // Are we editing and coming from MainActivity?
         val isEditingFromMainActivity = intent.getBooleanExtra(IS_EDITING_FROM_MAIN_ACTIVITY, false)
 
-        // Are we invoked from the main activity to edit it?
+        // Are we invoked from the main activity to edit/switch?
         val isFromMainActivity = intent.getBooleanExtra(IS_FROM_MAIN_ACTIVITY, false)
 
         /**
@@ -52,44 +53,49 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
          * For example when using cloudstreamsearch://
          *
          * In those cases we want to just go to the main activity instantly
-         **/
+         */
         if (hasLoggedIn && !isEditingFromMainActivity && !isFromMainActivity) {
             navigateToMainActivity()
             return
         }
 
         /**
-         * Here we set the themes, this *can* be deferred for faster instant login,
-         * but has some consequences that makes it undesirable even if it is slower
-         *
          * CommonActivity.init : loads the correct locale for default_account
          * loadThemes : loads the correct color on the toast when logging in
-         * */
+         */
         CommonActivity.init(this)
         loadThemes(this)
         enableEdgeToEdgeCompat()
-        setNavigationBarColorCompat(R.attr.primaryBlackBackground)
 
-        /**
-         * To avoid touching the UI layer, we use the raw state before the viewmodel is created
-         * to enable us to skip account selection but still use the ergonomics of AccountState
-         * */
+        val availableAvatars = AvatarCatalog.getAvatars(this)
+        val defaultAvatarUri = availableAvatars.firstOrNull()
+
+        val persistedAccounts = DataStoreHelper.accounts
+        val migratedAccounts = persistedAccounts
+            .map { AvatarCatalog.migrateAccount(this, it) }
+            .toTypedArray()
+        if (!migratedAccounts.contentEquals(persistedAccounts)) {
+            DataStoreHelper.accounts = migratedAccounts
+        }
+
         val defaultName = getString(R.string.default_account)
         val defaultAccount = Account(
             keyIndex = 0,
             name = defaultName,
             defaultImageIndex = 0,
+            avatar = defaultAvatarUri,
         )
         val initialState = AccountState(
             canEditAccount = isEditingFromMainActivity,
+            canNavigateBack = isFromMainActivity || isEditingFromMainActivity,
+            availableAvatars = availableAvatars.toImmutableList(),
             lastLoginKeyIndex = DataStoreHelper.selectedKeyIndex,
             accounts = SearchableData.from(
-                /** We must always have a default account
-                 * even if DataStoreHelper.accounts.size = 0 */
+                /** We must always have a default account even if DataStoreHelper.accounts.size = 0 */
                 data = persistentMapOf(defaultAccount.keyIndex to defaultAccount)
-                    .puttingAll(DataStoreHelper.accounts.associateBy { it.keyIndex }),
-                sortedBy = sortByInt { it.keyIndex }
-            )
+                    .puttingAll(migratedAccounts.associateBy { it.keyIndex }),
+                sortedBy = sortByInt { it.keyIndex },
+            ),
         )
 
         val settings = AppSettings(this)
@@ -103,22 +109,11 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
         ) {
             /** We must have an account without a pin */
             val currentAccount = initialState.accounts.data[initialState.lastLoginKeyIndex]
-            if (
-                currentAccount != null &&
-                currentAccount.lockPin == null
-            ) {
-                /**
-                 * Show toast if we have many accounts,
-                 * as it is unnecessary for 1 account
-                 * */
+            if (currentAccount != null && currentAccount.lockPin == null) {
                 DataStoreHelper.setAccount(
                     currentAccount,
-                    showToast = initialState.accounts.data.size > 1
+                    showToast = initialState.accounts.data.size > 1,
                 )
-                /**
-                 * We avoid using the viewmodel Login as we
-                 * can return *before* we load Compose code!
-                 * */
                 navigateToMainActivity()
                 return
             }
@@ -127,7 +122,7 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
         /**
          * If this app is locked with biometrics,
          * then require that on a startup that is not skipped!
-         * */
+         */
         if (
             !isFromMainActivity &&
             !isEditingFromMainActivity &&
@@ -138,7 +133,7 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
             startBiometricAuthentication(
                 this,
                 R.string.biometric_authentication_title,
-                false
+                false,
             )
             promptInfo?.let { prompt ->
                 biometricPrompt?.authenticate(prompt)
@@ -149,15 +144,27 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
             val viewModel = viewModel<AccountViewModel2> {
                 AccountViewModel2(
                     defaultAccount = defaultAccount,
-                    initialState = initialState
+                    initialState = initialState,
                 )
             }
             val state by viewModel.state.collectAsState()
-            if (state.loggedInWith != null) {
-                navigateToMainActivity()
+
+            LaunchedEffect(state.loggedInWith) {
+                if (state.loggedInWith != null) {
+                    if ((isFromMainActivity || isEditingFromMainActivity) && !isTaskRoot) {
+                        finish()
+                    } else {
+                        navigateToMainActivity()
+                    }
+                }
             }
+
             CloudStreamThemeAppSettings {
-                AccountScreen.Content(state, viewModel::onAction)
+                AccountScreen.Content(
+                    state = state,
+                    onAction = viewModel::onAction,
+                    onBack = { finish() },
+                )
             }
         }
     }
@@ -165,9 +172,8 @@ class AccountSelectActivity2 : FragmentActivity(), BiometricCallback {
     @SuppressLint("UnsafeIntentLaunch")
     private fun navigateToMainActivity() {
         hasLoggedIn = true
-        // We want to propagate any intent we get here to MainActivity since this is just an intermediary
         openActivity(MainActivity::class.java, baseIntent = intent)
-        finish() // Finish the account selection activity
+        finish()
     }
 
     override fun onAuthenticationSuccess() {

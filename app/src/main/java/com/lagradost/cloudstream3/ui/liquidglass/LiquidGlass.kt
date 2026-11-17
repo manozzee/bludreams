@@ -200,7 +200,7 @@ fun Modifier.drawInteractiveGlass(
     shape: Shape,
     interaction: GlassInteraction?,
     pressedScale: Float = 1.12f,
-    highlight: Highlight = Highlight.Default,
+    highlight: Highlight? = Highlight.Default,
     blurScale: Float = 1f,
     minScrim: Float = GlassRecipe.MIN_SCRIM,
     maxScrim: Float = GlassRecipe.MAX_SCRIM,
@@ -290,6 +290,7 @@ fun Modifier.liquidGlass(
     shape: Shape = CircleShape,
     interactive: Boolean = true,
     blurScale: Float = 1f,
+    showHighlight: Boolean = true,
 ): Modifier {
     if (!LocalLiquidGlass.current || backdrop == null || !isLiquidGlassBackdropSupported()) {
         return this
@@ -304,7 +305,7 @@ fun Modifier.liquidGlass(
         luminanceAnimation = 0.5f,
         shape = shape,
         interaction = interaction,
-        highlight = Highlight.Default,
+        highlight = if (showHighlight) Highlight.Default else null,
         blurScale = blurScale,
         drawTick = drawTick,
     )

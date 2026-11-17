@@ -40,9 +40,16 @@ misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
 
-# Keystore files
+# Keystore and signing files
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.bks
+*.pk8
+*.pem
+keystore.properties
+signing.properties
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json

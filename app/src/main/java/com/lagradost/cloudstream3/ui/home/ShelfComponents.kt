@@ -96,9 +96,11 @@ fun SectionHeader(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 16.sp,
+                ),
                 color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -272,14 +274,15 @@ fun PosterCard(
                 )
                 .clip(cardShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.08f),
-                    shape = cardShape,
-                )
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick,
+                .then(
+                    if (onLongClick != null) {
+                        Modifier.combinedClickable(
+                            onClick = onClick,
+                            onLongClick = onLongClick,
+                        )
+                    } else {
+                        Modifier.clickable(onClick = onClick)
+                    },
                 ),
         ) {
             if (imageRequest != null) {

@@ -87,7 +87,7 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import androidx.activity.ComponentActivity
 import com.lagradost.cloudstream3.utils.DataStoreHelper.Account
-import com.lagradost.cloudstream3.utils.DataStoreHelper.profileImages
+import com.lagradost.cloudstream3.ui.account.AvatarCatalog
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream4.compose.Screen
 import com.lagradost.cloudstream4.compose.TV
@@ -225,7 +225,7 @@ object SettingsFragmentScreen : Screen {
                     Text(
                         text = stringResource(R.string.title_settings),
                         style = MaterialTheme.typography.titleLarge.copy(
-                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.plusJakartaSans,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 24.sp,
                             color = Color.White,
@@ -378,8 +378,8 @@ object SettingsFragmentScreen : Screen {
 
     @Composable
     fun AccountCard(account: Account, onClick: () -> Unit) {
-        val image = account.customImage ?: profileImages.getOrNull(account.defaultImageIndex)
-            ?: profileImages.first()
+        val context = LocalContext.current
+        val image = remember(account) { AvatarCatalog.resolveAvatar(context, account) }
 
         Column(
             modifier = Modifier.settingsCard(GroupPosition.Single),
@@ -408,7 +408,7 @@ object SettingsFragmentScreen : Screen {
                     Text(
                         text = account.name,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.plusJakartaSans,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White,
                             fontSize = 15.sp,
@@ -420,7 +420,7 @@ object SettingsFragmentScreen : Screen {
                     Text(
                         text = "Switch profile or manage account",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.inter,
                             color = Color.White.copy(alpha = 0.65f),
                             fontSize = 13.sp,
                         ),
@@ -484,7 +484,7 @@ object SettingsFragmentScreen : Screen {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.outfit,
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.plusJakartaSans,
                             fontWeight = FontWeight.Medium,
                             color = Color.White,
                             fontSize = 15.sp,
@@ -496,7 +496,7 @@ object SettingsFragmentScreen : Screen {
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.figtree,
+                            fontFamily = com.lagradost.cloudstream4.theme.AppFont.inter,
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 12.sp,
                         ),
